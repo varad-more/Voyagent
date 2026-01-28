@@ -29,8 +29,8 @@ using **Google Gemini** and external travel tools with cache fallback.
 
 ### Requirements
 - Python 3.11+
-- Postgres for production (SQLite supported for dev)
-- Optional Redis for cache
+- Postgres (single database for app + cache)
+- Redis optional (leave unset to keep everything in Postgres)
 
 ### Setup
 ```
@@ -50,6 +50,23 @@ pip install -e .
 cp .env.example .env
 ```
 
+### Local Postgres (single DB mode)
+1. Install and run Postgres locally.
+2. Create a database and user (example commands):
+   ```
+   createuser -P trip_user
+   createdb -O trip_user trip_planner
+   ```
+3. Update `backend/.env`:
+   ```
+   TRIP_DATABASE_URL=postgresql+asyncpg://trip_user:your_password@localhost:5432/trip_planner
+   TRIP_REDIS_URL=
+   ```
+4. Run migrations:
+   ```
+   alembic upgrade head
+   ```
+
 ### Migrations
 ```
 alembic upgrade head
@@ -68,7 +85,7 @@ uvicorn app.main:app --reload
 ### Environment variables
 ```
 TRIP_DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trips
-TRIP_REDIS_URL=redis://localhost:6379/0
+TRIP_REDIS_URL=
 TRIP_GEMINI_API_KEY=your_key
 TRIP_GEMINI_MODEL=gemini-1.5-flash
 TRIP_OPENWEATHER_API_KEY=your_key
@@ -158,6 +175,6 @@ The app works without API keys (uses safe stubs), but results improve with keys.
 3. If missing, the backend uses a 1:1 fallback.
 
 ## Notes
-- All external API calls are cached in DB with TTL and optionally Redis.
+- All external API calls are cached in Postgres with TTL and optionally Redis.
 - Gemini responses are strictly validated by Pydantic v2 with JSON repair retries.
 - Agent traces (drafts/issues/final) are persisted per itinerary.
