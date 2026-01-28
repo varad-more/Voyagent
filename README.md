@@ -41,6 +41,15 @@ pip install -e .
 cp .env.example .env
 ```
 
+### Setup with Conda
+```
+cd backend
+conda create -n trip-planner python=3.11 -y
+conda activate trip-planner
+pip install -e .
+cp .env.example .env
+```
+
 ### Migrations
 ```
 alembic upgrade head
@@ -50,6 +59,11 @@ alembic upgrade head
 ```
 uvicorn app.main:app --reload
 ```
+
+### Development install options
+- `pip install -e .` for editable install
+- `pip install -e ".[dev]"` for dev/test tooling
+- `pip install .` for a regular install
 
 ### Environment variables
 ```
