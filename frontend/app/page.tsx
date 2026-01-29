@@ -6,8 +6,9 @@ import { useMutation } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api";
 import { ItineraryResponse } from "@/lib/types";
 import { TripRequest } from "@/lib/validation";
-import { ItineraryResult } from "@/components/ItineraryResult";
+import ItineraryResult from "@/components/ItineraryResult";
 import { TripForm } from "@/components/TripForm";
+import { DUMMY_ITINERARY } from "@/lib/dummyData";
 
 export default function HomePage() {
   const [itinerary, setItinerary] = useState<ItineraryResponse | null>(null);
@@ -100,12 +101,23 @@ export default function HomePage() {
         </header>
 
         {/* Form Section */}
-        <section className="relative">
-          <TripForm
-            onSubmit={(payload) => mutation.mutate(payload)}
-            isLoading={mutation.isPending}
-          />
-        </section>
+        {!itinerary && (
+          <section className="relative">
+            <TripForm
+              onSubmit={(payload) => mutation.mutate(payload)}
+              isLoading={mutation.isPending}
+            />
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setItinerary(DUMMY_ITINERARY)}
+                className="text-sm font-medium text-slate-500 hover:text-purple-400 transition-colors flex items-center justify-center gap-2 mx-auto group"
+              >
+                <span>👀</span>
+                <span className="group-hover:underline">Preview with Demo Data</span>
+              </button>
+            </div>
+          </section>
+        )}
 
         {/* Error Display */}
         {mutation.error && (
@@ -155,26 +167,8 @@ export default function HomePage() {
 
         {/* Results Section */}
         {itinerary && (
-          <section className="mt-12 animate-fadeIn">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">🎉</span>
-                <h2 className="text-2xl font-bold text-white">Your Itinerary is Ready!</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setItinerary(null)}
-                className="text-sm text-slate-400 hover:text-white transition-colors
-                           flex items-center gap-2 px-4 py-2 rounded-lg
-                           hover:bg-slate-800/50"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                Plan Another Trip
-              </button>
-            </div>
-            <ItineraryResult itinerary={itinerary} />
+          <section className="mt-8 animate-fadeIn">
+            <ItineraryResult itinerary={itinerary} onReset={() => setItinerary(null)} />
           </section>
         )}
 

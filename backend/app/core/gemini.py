@@ -54,6 +54,18 @@ class GeminiClient:
             )
             return response.text or ""
 
+    def generate_from_image(self, image_bytes: bytes, prompt: str) -> str:
+        import PIL.Image
+        import io
+        
+        try:
+            image = PIL.Image.open(io.BytesIO(image_bytes))
+            response = self.model.generate_content([prompt, image])
+            return response.text
+        except Exception as e:
+            logger.error("image_generation_failed", error=str(e))
+            raise
+
 
 def build_schema_from_model(model: type[BaseModel]) -> dict[str, Any]:
     return model.model_json_schema()

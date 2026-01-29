@@ -137,6 +137,34 @@ class ValidationResult(StrictBaseModel):
     details: str
 
 
+class TransportOption(StrictBaseModel):
+    mode: Literal["public_transit", "private_driver", "rental_car", "taxi", "rideshare", "walking"]
+    description: str
+    cost_estimate: str
+    duration_estimate: str
+    fuel_cost_estimate: str | None = None
+    misc_costs: list[str] = Field(default_factory=list)
+    pros: list[str] = Field(default_factory=list)
+    cons: list[str] = Field(default_factory=list)
+
+
+class TransportAnalysis(StrictBaseModel):
+    options: list[TransportOption] = Field(default_factory=list)
+    recommended_mode: str
+    reasoning: str
+
+
+class TravelOption(StrictBaseModel):
+    type: Literal["car", "hotel", "flight"]
+    name: str
+    provider: str
+    price_estimate: str
+    details: str
+    booking_url: str | None = None
+    rating: float | None = None
+    features: list[str] = Field(default_factory=list)
+
+
 class ItineraryResponse(StrictBaseModel):
     itinerary_id: int
     summary: str
@@ -147,6 +175,8 @@ class ItineraryResponse(StrictBaseModel):
     budget: BudgetPlan
     validation: list[ValidationResult]
     warnings: list[str] = Field(default_factory=list)
+    travel_options: list[TravelOption] = Field(default_factory=list)
+    transport_analysis: TransportAnalysis | None = None
     generated_at: dt.datetime
 
 

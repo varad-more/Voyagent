@@ -32,44 +32,50 @@ async def get_travel_time_minutes(
         return cached
 
     if settings.distance_matrix_api_key:
-        async with httpx.AsyncClient(timeout=15) as client:
-            resp = await client.get(
-                "https://maps.googleapis.com/maps/api/distancematrix/json",
-                params={
-                    "origins": origin,
-                    "destinations": destination,
-                    "key": settings.distance_matrix_api_key,
-                    "units": "metric",
-                },
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            rows = data.get("rows", [])
-            duration = rows[0]["elements"][0]["duration"]["value"] / 60 if rows else 20
-            payload = {"travel_time_minutes": int(duration)}
-            await cache.set(
-                cache_key, "distance_matrix", payload, settings.cache_ttl_travel_seconds, session
-            )
-            return payload
+        try:
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.get(
+                    "https://maps.googleapis.com/maps/api/distancematrix/json",
+                    params={
+                        "origins": origin,
+                        "destinations": destination,
+                        "key": settings.distance_matrix_api_key,
+                        "units": "metric",
+                    },
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                rows = data.get("rows", [])
+                duration = rows[0]["elements"][0]["duration"]["value"] / 60 if rows else 20
+                payload = {"travel_time_minutes": int(duration)}
+                await cache.set(
+                    cache_key, "distance_matrix", payload, settings.cache_ttl_travel_seconds, session
+                )
+                return payload
+        except Exception:
+            pass  # Fallback to OSRM or default
 
     origin_coords = _parse_coordinates(origin)
     dest_coords = _parse_coordinates(destination)
     if origin_coords and dest_coords:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.get(
-                f"https://router.project-osrm.org/route/v1/driving/"
-                f"{origin_coords[1]},{origin_coords[0]};{dest_coords[1]},{dest_coords[0]}",
-                params={"overview": "false"},
-            )
-            resp.raise_for_status()
-            data = resp.json()
-            routes = data.get("routes", [])
-            duration = routes[0]["duration"] / 60 if routes else 20
-            payload = {"travel_time_minutes": int(duration)}
-            await cache.set(
-                cache_key, "osrm", payload, settings.cache_ttl_travel_seconds, session
-            )
-            return payload
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                resp = await client.get(
+                    f"https://router.project-osrm.org/route/v1/driving/"
+                    f"{origin_coords[1]},{origin_coords[0]};{dest_coords[1]},{dest_coords[0]}",
+                    params={"overview": "false"},
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                routes = data.get("routes", [])
+                duration = routes[0]["duration"] / 60 if routes else 20
+                payload = {"travel_time_minutes": int(duration)}
+                await cache.set(
+                    cache_key, "osrm", payload, settings.cache_ttl_travel_seconds, session
+                )
+                return payload
+        except Exception:
+            pass  # Fallback to default
 
     payload = {"travel_time_minutes": 20}
     await cache.set(

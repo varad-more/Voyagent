@@ -50,6 +50,14 @@ pip install -e .
 cp .env.example .env
 ```
 
+### Setup with an existing Conda env (example: personal)
+```
+cd backend
+conda activate personal
+pip install -e .
+cp .env.example .env
+```
+
 ### Local Postgres (single DB mode)
 1. Install and run Postgres locally.
 2. Create a database and user (example commands):
@@ -146,6 +154,11 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev
 ## Getting API keys
 
 The app works without API keys (uses safe stubs), but results improve with keys.
+
+### Where to put keys
+Set keys in `backend/.env` (copied from `backend/.env.example`).
+
+Tip: never commit real keys. Rotate keys if they have been exposed.
 
 ### Gemini (required for full LLM planning)
 1. Go to Google AI Studio: https://aistudio.google.com/app/apikey

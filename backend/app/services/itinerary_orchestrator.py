@@ -10,6 +10,7 @@ from app.agents.attractions import AttractionsAgent
 from app.agents.budget import BudgetAgent
 from app.agents.food import FoodAgent
 from app.agents.planner import PlannerAgent
+from app.agents.research import ResearchAgent
 from app.agents.scheduler import SchedulerAgent
 from app.agents.validator import ValidatorAgent
 from app.agents.weather import WeatherAgent
@@ -17,7 +18,7 @@ from app.core.config import get_settings
 from app.core.gemini import GeminiClient
 from app.models.trace import AgentTrace
 from app.schemas.agents import OrchestratorOutput
-from app.schemas.itinerary import DayPlan, ItineraryResponse, TripRequest
+from app.schemas.itinerary import DayPlan, ItineraryResponse, TravelOption, TripRequest
 
 
 logger = structlog.get_logger(__name__)
@@ -109,6 +110,7 @@ async def generate_itinerary(
             logger.warning("gemini_unavailable", error=str(exc))
 
     planner_agent = PlannerAgent(gemini_client)
+    research_agent = ResearchAgent(gemini_client)
     weather_agent = WeatherAgent(gemini_client)
     attractions_agent = AttractionsAgent(gemini_client)
     scheduler_agent = SchedulerAgent(gemini_client)
@@ -116,7 +118,20 @@ async def generate_itinerary(
     budget_agent = BudgetAgent(gemini_client)
     validator_agent = ValidatorAgent()
 
-    planner_result = await planner_agent.run(trip=trip)
+    research_context = ""
+    if gemini_client:
+        research_context = await research_agent.conduct_research(trip, session)
+        await _store_trace(
+            session=session,
+            itinerary_id=itinerary_id,
+            agent_name="research_agent",
+            step_name="final",
+            input_json={"trip": trip.model_dump(mode="json")},
+            output_json={"research_context": research_context},
+            issues=None,
+        )
+
+    planner_result = await planner_agent.run(trip=trip, research_context=research_context)
     await _persist_agent_result(
         session=session,
         itinerary_id=itinerary_id,
@@ -229,6 +244,27 @@ async def generate_itinerary(
 
     packing_list = _build_packing_list(weather_result.data.weather.model_dump(), trip)
 
+    # Generate travel options (cars, hotels, flights) AND transport analysis
+    travel_data = await research_agent.get_travel_options(trip, session)
+    
+    # Extract lists from the dictionary response
+    booking_options_raw = travel_data.get("booking_options", [])
+    transport_analysis_raw = travel_data.get("transport_analysis")
+
+    travel_options = [
+        TravelOption(
+            type=opt.get("type", "hotel"),
+            name=opt.get("name", "Unknown"),
+            provider=opt.get("provider", "Unknown"),
+            price_estimate=opt.get("price_estimate", "N/A"),
+            details=opt.get("details", ""),
+            booking_url=opt.get("booking_url"),
+            rating=opt.get("rating"),
+            features=opt.get("features", []),
+        )
+        for opt in booking_options_raw
+    ]
+
     orchestrator_output = OrchestratorOutput(
         summary=planner_result.data.summary,
         days=days,
@@ -250,6 +286,8 @@ async def generate_itinerary(
         budget=orchestrator_output.budget,
         validation=orchestrator_output.validation,
         warnings=orchestrator_output.warnings,
+        travel_options=travel_options,
+        transport_analysis=transport_analysis_raw,
         generated_at=dt.datetime.now(dt.timezone.utc),
     )
     return response

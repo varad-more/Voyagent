@@ -11,7 +11,7 @@ from app.schemas.itinerary import TripRequest
 class PlannerAgent(BaseAgent):
     name = "planner"
 
-    async def run(self, *, trip: TripRequest) -> AgentResult:
+    async def run(self, *, trip: TripRequest, research_context: str | None = None) -> AgentResult:
         if not self.gemini_client:
             days = []
             current = trip.start_date
@@ -40,6 +40,8 @@ class PlannerAgent(BaseAgent):
             f"Pace: {trip.activity_preferences.pace}\n"
             f"Notes: {trip.notes or 'None'}"
         )
+        if research_context:
+            user += f"\n\n{research_context}"
         data, drafts, issues = generate_validated(
             client=self.gemini_client,
             system_prompt=system,

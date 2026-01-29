@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { tripRequestSchema, TripRequest } from "@/lib/validation";
+import { apiFetch } from "@/lib/api";
 
 type TripFormProps = {
   onSubmit: (payload: TripRequest) => void;
@@ -513,6 +514,52 @@ export function TripForm({ onSubmit, isLoading }: TripFormProps) {
     setValues((prev) => ({ ...prev, [field]: value }));
   };
 
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsAnalyzing(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      // Use apiFetch which now supports FormData
+      const response = await apiFetch<any>("/api/analysis/image", {
+        method: "POST",
+        body: formData,
+      });
+
+      // Populate form
+      if (response.destination) updateField("destination", response.destination);
+
+      if (response.interests && response.interests.length > 0) {
+        // Merge with existing interests, avoiding duplicates
+        const uniqueInterests = Array.from(new Set([...values.interests, ...response.interests]));
+        updateField("interests", uniqueInterests);
+      }
+
+      // Add vibe and activities to notes
+      if (response.vibe || (response.suggested_activities && response.suggested_activities.length > 0)) {
+        let noteAdditions = "";
+        if (response.vibe) noteAdditions += `Vibe: ${response.vibe}\n`;
+        if (response.suggested_activities) noteAdditions += `Suggested Activities from Image: ${response.suggested_activities.join(", ")}`;
+
+        const newNotes = values.notes ? `${values.notes}\n\n${noteAdditions}` : noteAdditions;
+        updateField("notes", newNotes);
+      }
+    } catch (err) {
+      console.error("Image analysis failed", err);
+      alert("Could not analyze image. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+      // Reset input
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     setError(null);
@@ -563,6 +610,46 @@ export function TripForm({ onSubmit, isLoading }: TripFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* AI Image Analysis */}
+      <div className="glass-card p-6 rounded-2xl mb-8 relative overflow-hidden group">
+        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-blue-400 to-purple-500"></div>
+        <div className="flex flex-col md:flex-row items-center gap-6">
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-white flex items-center gap-2">
+              <span className="text-2xl">📸</span> Plan from a Photo
+            </h3>
+            <p className="text-slate-400 text-sm mt-1">
+              Upload a photo (screenshot of a deal, a landmark, or a vibe) and Gemini will extract the destination and interests for you.
+            </p>
+          </div>
+          <div className="relative">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              ref={fileInputRef}
+              onChange={handleImageUpload}
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isAnalyzing}
+              className="px-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-blue-300 font-medium transition-all flex items-center gap-2 group-hover:border-blue-500/50 shadow-lg hover:shadow-blue-500/10"
+            >
+              {isAnalyzing ? (
+                <>
+                  <span className="animate-spin">🌀</span> Analyzing...
+                </>
+              ) : (
+                <>
+                  <span>📤</span> Upload Image
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* Error Display */}
       {error && (
         <div className="flex items-center gap-3 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl animate-shake">

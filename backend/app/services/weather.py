@@ -58,27 +58,36 @@ async def get_weather(
         return payload
 
     async with httpx.AsyncClient(timeout=15) as client:
-        geo_resp = await client.get(
-            "https://api.openweathermap.org/geo/1.0/direct",
-            params={"q": destination, "limit": 1, "appid": settings.openweather_api_key},
-        )
-        geo_resp.raise_for_status()
-        geo_data = geo_resp.json()
-        if not geo_data:
+        try:
+            geo_resp = await client.get(
+                "https://api.openweathermap.org/geo/1.0/direct",
+                params={"q": destination, "limit": 1, "appid": settings.openweather_api_key},
+            )
+            geo_resp.raise_for_status()
+            geo_data = geo_resp.json()
+            if not geo_data:
+                logger.warning("openweather_geo_not_found", destination=destination)
+                payload = await _stub_weather(start_date, end_date)
+                await cache.set(
+                    cache_key, "openweather", payload, settings.cache_ttl_weather_seconds, session
+                )
+                return payload
+            lat = geo_data[0]["lat"]
+            lon = geo_data[0]["lon"]
+
+            forecast_resp = await client.get(
+                "https://api.openweathermap.org/data/2.5/forecast",
+                params={"lat": lat, "lon": lon, "appid": settings.openweather_api_key, "units": "metric"},
+            )
+            forecast_resp.raise_for_status()
+            forecast = forecast_resp.json()
+        except Exception as exc:
+            logger.error("openweather_api_failed", error=str(exc))
             payload = await _stub_weather(start_date, end_date)
             await cache.set(
                 cache_key, "openweather", payload, settings.cache_ttl_weather_seconds, session
             )
             return payload
-        lat = geo_data[0]["lat"]
-        lon = geo_data[0]["lon"]
-
-        forecast_resp = await client.get(
-            "https://api.openweathermap.org/data/2.5/forecast",
-            params={"lat": lat, "lon": lon, "appid": settings.openweather_api_key, "units": "metric"},
-        )
-        forecast_resp.raise_for_status()
-        forecast = forecast_resp.json()
 
     buckets: dict[dt.date, list[dict[str, Any]]] = defaultdict(list)
     for item in forecast.get("list", []):

@@ -78,6 +78,36 @@ async def generate_itinerary_route(
     await session.commit()
     return result
 
+@router.patch("/{itinerary_id}", response_model=ItineraryRecord)
+async def update_itinerary(
+    itinerary_id: int,
+    itinerary_data: ItineraryResponse,
+    session: AsyncSession = Depends(get_session),
+) -> ItineraryRecord:
+    result = await session.execute(select(Itinerary).where(Itinerary.id == itinerary_id))
+    itinerary = result.scalar_one_or_none()
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="Itinerary not found")
+
+    # Update result_json with the provided full itinerary state
+    itinerary.result_json = itinerary_data.model_dump(mode="json")
+    # Explicitly touch updated_at (though SQLAlchemy onupdate might handle it, good to be sure)
+    # itinerary.updated_at = dt.datetime.now(dt.timezone.utc) 
+    
+    await session.commit()
+    await session.refresh(itinerary)
+
+    return ItineraryRecord(
+        id=itinerary.id,
+        status=itinerary.status,
+        request=TripRequest.model_validate(itinerary.request_json),
+        result=ItineraryResponse.model_validate(itinerary.result_json),
+        error_message=itinerary.error_message,
+        created_at=itinerary.created_at,
+        updated_at=itinerary.updated_at,
+    )
+
+
 
 @router.get("/{itinerary_id}", response_model=ItineraryRecord)
 async def get_itinerary(
