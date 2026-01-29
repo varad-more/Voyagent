@@ -25,7 +25,7 @@ async def _background_generate(itinerary_id: int, trip: TripRequest) -> None:
                 trip=trip, itinerary_id=itinerary_id, session=session
             )
             itinerary.status = "completed"
-            itinerary.result_json = response.model_dump()
+            itinerary.result_json = response.model_dump(mode="json")
         except Exception as exc:  # pragma: no cover - external failures
             itinerary.status = "failed"
             itinerary.error_message = str(exc)
@@ -38,7 +38,7 @@ async def queue_itinerary(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
 ) -> ItineraryRecord:
-    itinerary = Itinerary(status="queued", request_json=trip.model_dump())
+    itinerary = Itinerary(status="queued", request_json=trip.model_dump(mode="json"))
     session.add(itinerary)
     await session.commit()
     await session.refresh(itinerary)
@@ -60,7 +60,7 @@ async def generate_itinerary_route(
     trip: TripRequest,
     session: AsyncSession = Depends(get_session),
 ) -> ItineraryResponse:
-    itinerary = Itinerary(status="processing", request_json=trip.model_dump())
+    itinerary = Itinerary(status="processing", request_json=trip.model_dump(mode="json"))
     session.add(itinerary)
     await session.commit()
     await session.refresh(itinerary)
@@ -74,7 +74,7 @@ async def generate_itinerary_route(
         raise HTTPException(status_code=500, detail="Failed to generate itinerary") from exc
 
     itinerary.status = "completed"
-    itinerary.result_json = result.model_dump()
+    itinerary.result_json = result.model_dump(mode="json")
     await session.commit()
     return result
 

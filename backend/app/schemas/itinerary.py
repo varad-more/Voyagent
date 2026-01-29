@@ -8,7 +8,7 @@ from pydantic.config import ConfigDict
 
 
 class StrictBaseModel(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+    model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
 
 class Travelers(StrictBaseModel):

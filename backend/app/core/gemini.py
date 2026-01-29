@@ -25,16 +25,34 @@ class GeminiClient:
         self.model = genai.GenerativeModel(settings.gemini_model)
 
     @retry(wait=wait_exponential(multiplier=1, min=2, max=8), stop=stop_after_attempt(3))
-    def generate_content(self, prompt: str, schema: dict[str, Any]) -> str:
-        response = self.model.generate_content(
-            prompt,
-            generation_config={
-                "response_mime_type": "application/json",
-                "response_schema": schema,
-                "temperature": 0.4,
-            },
-        )
-        return response.text or ""
+    def generate_content(self, prompt: str, schema: dict[str, Any] | None = None) -> str:
+        """Generate content with optional schema guidance.
+        
+        Note: For newer models like gemini-2.5-flash, response_schema may not be 
+        fully supported. We include the schema in the prompt for better compatibility.
+        """
+        try:
+            # Try with response_schema first (works with older models)
+            response = self.model.generate_content(
+                prompt,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "response_schema": schema,
+                    "temperature": 0.4,
+                },
+            )
+            return response.text or ""
+        except Exception as e:
+            # If response_schema fails, try without it (for newer models)
+            logger.warning("response_schema failed, retrying without it", error=str(e))
+            response = self.model.generate_content(
+                prompt,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "temperature": 0.4,
+                },
+            )
+            return response.text or ""
 
 
 def build_schema_from_model(model: type[BaseModel]) -> dict[str, Any]:
@@ -46,7 +64,7 @@ def render_prompt(system: str, user: str, schema: dict[str, Any]) -> str:
     return (
         f"{system}\n\n"
         f"USER REQUEST:\n{user}\n\n"
-        "Return ONLY valid JSON that matches this schema.\n"
+        "Return ONLY valid JSON that matches this schema exactly. No other text.\n"
         f"SCHEMA:\n{schema_json}\n"
     )
 

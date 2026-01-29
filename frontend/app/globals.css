@@ -1,9 +1,385 @@
 @import "tailwindcss";
 
+/* Base styles with vibrant background */
 body {
-  @apply bg-slate-950 text-slate-100;
+  @apply text-white;
+  background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 25%, #16213e 50%, #0f0f1a 100%);
+  min-height: 100vh;
+  position: relative;
+}
+
+/* Animated gradient overlay */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background:
+    radial-gradient(ellipse at 20% 20%, rgba(120, 119, 198, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(255, 119, 198, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 40% 60%, rgba(59, 130, 246, 0.1) 0%, transparent 40%),
+    radial-gradient(ellipse at 70% 30%, rgba(16, 185, 129, 0.15) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+  animation: aurora 20s ease infinite;
+}
+
+@keyframes aurora {
+
+  0%,
+  100% {
+    opacity: 1;
+    filter: hue-rotate(0deg);
+  }
+
+  50% {
+    opacity: 0.8;
+    filter: hue-rotate(30deg);
+  }
 }
 
 a {
-  @apply text-emerald-300;
+  @apply text-cyan-400 transition-colors hover:text-cyan-300;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shake {
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-4px);
+  }
+
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+@keyframes float {
+
+  0%,
+  100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+
+  33% {
+    transform: translateY(-15px) rotate(2deg);
+  }
+
+  66% {
+    transform: translateY(-8px) rotate(-1deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+@keyframes gradient-shift {
+
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes glow-pulse {
+
+  0%,
+  100% {
+    filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.5));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 40px rgba(147, 51, 234, 0.6));
+  }
+}
+
+@keyframes sparkle {
+
+  0%,
+  100% {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.2s ease-out forwards;
+}
+
+.animate-shake {
+  animation: shake 0.5s ease-out;
+}
+
+.animate-float {
+  animation: float 4s ease-in-out infinite;
+}
+
+.animate-glow {
+  animation: glow-pulse 3s ease-in-out infinite;
+}
+
+/* Animated gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #60a5fa, #a78bfa, #f472b6, #fb7185, #60a5fa);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 8s ease infinite;
+}
+
+/* Hero gradient text - more vibrant */
+.hero-gradient {
+  background: linear-gradient(135deg, #22d3ee 0%, #818cf8 25%, #e879f9 50%, #fb7185 75%, #22d3ee 100%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-shift 6s ease infinite;
+}
+
+/* Glass card with colorful border */
+.glass-card {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.8) 0%, rgba(15, 23, 42, 0.9) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+  position: relative;
+}
+
+.glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.3), rgba(167, 139, 250, 0.3), rgba(244, 114, 182, 0.3));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+}
+
+/* Vibrant button styles */
+.btn-vibrant {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6, #d946ef);
+  background-size: 200% 200%;
+  animation: gradient-shift 4s ease infinite;
+  box-shadow:
+    0 4px 15px rgba(139, 92, 246, 0.4),
+    0 0 40px rgba(139, 92, 246, 0.2);
+  transition: all 0.3s ease;
+}
+
+.btn-vibrant:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 25px rgba(139, 92, 246, 0.5),
+    0 0 60px rgba(139, 92, 246, 0.3);
+}
+
+/* Form input glow effect */
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow:
+    0 0 0 2px rgba(139, 92, 246, 0.3),
+    0 0 20px rgba(139, 92, 246, 0.2);
+}
+
+/* Enhanced form inputs */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7) sepia(1) saturate(5) hue-rotate(200deg);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  filter: invert(0.8) sepia(1) saturate(5) hue-rotate(260deg);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(30, 41, 59, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(135deg, #818cf8, #a78bfa);
+}
+
+/* Selection color */
+::selection {
+  background: rgba(139, 92, 246, 0.4);
+  color: white;
+}
+
+/* Focus visible outline */
+:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.6);
+  outline-offset: 2px;
+}
+
+/* Tag styles with gradient */
+.tag-gradient {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+  border: 1px solid rgba(139, 92, 246, 0.4);
+}
+
+/* Section icon glow */
+.icon-glow {
+  filter: drop-shadow(0 0 8px currentColor);
+}
+
+/* Number input hide arrows */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+/* Smooth transitions */
+button,
+input,
+select,
+textarea,
+a {
+  transition: all 0.2s ease;
+}
+
+/* Range slider with gradient */
+input[type="range"] {
+  -webkit-appearance: none;
+  height: 8px;
+  background: linear-gradient(90deg, #3b82f6, #8b5cf6, #d946ef);
+  border-radius: 4px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  cursor: pointer;
+  border: 3px solid #1e293b;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  cursor: pointer;
+  border: 3px solid #1e293b;
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+}
+
+/* Decorative elements */
+.floating-icon {
+  animation: float 5s ease-in-out infinite;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.3));
+}
+
+/* Sparkle effect container */
+.sparkle-container {
+  position: relative;
+}
+
+.sparkle-container::after {
+  content: '✨';
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  font-size: 16px;
+  animation: sparkle 2s ease-in-out infinite;
 }
