@@ -1,193 +1,182 @@
-# Agentic LLM Trip Planner (Gemini + FastAPI + Next.js)
+# Trip Planner - AI-Powered Trip Scheduling
 
-Production-ready monorepo for an **agentic trip planner** that builds validated,
-weather-aware, day-by-day itineraries. The backend orchestrates specialized agents
-using **Google Gemini** and external travel tools with cache fallback.
+An AI-powered trip planning application using Django and Google Gemini. Features an agentic architecture with 8 specialized agents for comprehensive trip planning.
 
-## Monorepo layout
+## Project Structure
 
 ```
-/backend   FastAPI + SQLAlchemy + Alembic + Gemini orchestrator
-/frontend  Next.js App Router + Tailwind + TanStack Query
+trip-scheduler-agentic-llm/
+├── manage.py                    # Django management script
+├── requirements.txt             # Python dependencies
+├── .env.example                 # Environment variables template
+├── README.md
+│
+└── trip_planner/                # Main Django application
+    ├── settings.py              # Django settings
+    ├── urls.py                  # Root URL configuration
+    ├── wsgi.py / asgi.py        # Server interfaces
+    │
+    ├── models/                  # Database models
+    │   ├── itinerary.py         # Itinerary model
+    │   ├── trace.py             # Agent trace model
+    │   └── cache.py             # External cache model
+    │
+    ├── api/                     # REST API
+    │   ├── serializers.py       # Request/response serializers
+    │   ├── urls.py              # API routes
+    │   └── views/               # API views
+    │       ├── itineraries.py   # Itinerary CRUD
+    │       ├── analysis.py      # Image analysis
+    │       └── edit.py          # Block editing
+    │
+    ├── agents/                  # AI Agents
+    │   ├── base.py              # Base agent class
+    │   ├── planner.py           # Day-by-day planning
+    │   ├── research.py          # Accommodation/transport research
+    │   ├── weather.py           # Weather analysis
+    │   ├── attractions.py       # Attraction ranking
+    │   ├── scheduler.py         # Timed schedule creation
+    │   ├── food.py              # Meal planning
+    │   ├── budget.py            # Cost calculation
+    │   └── validator.py         # Schedule validation
+    │
+    ├── services/                # Business logic
+    │   ├── orchestrator.py      # Agent coordination
+    │   ├── gemini.py            # Gemini AI client
+    │   ├── places.py            # Google Places API
+    │   ├── weather.py           # OpenWeather API
+    │   ├── travel_time.py       # Distance calculation
+    │   └── currency.py          # Currency conversion
+    │
+    └── core/                    # Utilities
+        ├── cache.py             # Caching utilities
+        ├── exceptions.py        # Custom exceptions
+        └── utils.py             # Helper functions
 ```
 
-## Workflow overview
+## Setup Instructions
 
-1. Frontend collects trip preferences and sends a request to the backend.
-2. The orchestrator runs specialist agents:
-   - PlannerAgent: day-by-day skeleton
-   - WeatherAgent: forecast + risks + adjustments
-   - AttractionsAgent: top nearby places
-   - SchedulerAgent: timed itinerary + buffers
-   - FoodAgent: meals by preference + proximity
-   - BudgetAgent: budget breakdown + downgrade plan
-   - ValidatorAgent: overlap and feasibility checks
-3. Results + agent traces are stored in Postgres/SQLite.
-4. Frontend renders the itinerary and exports a .ics calendar.
+### 1. Create Conda Environment
 
-## Backend (FastAPI)
-
-### Requirements
-- Python 3.11+
-- Postgres (single database for app + cache)
-- Redis optional (leave unset to keep everything in Postgres)
-
-### Setup
-```
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .
-cp .env.example .env
-```
-
-### Setup with Conda
-```
-cd backend
+```bash
+# Create new conda environment with Python 3.11
 conda create -n trip-planner python=3.11 -y
+
+# Activate the environment
 conda activate trip-planner
-pip install -e .
+```
+
+### 2. Install Dependencies
+
+```bash
+# Navigate to project directory
+cd trip-scheduler-agentic-llm
+
+# Install Python packages
+pip install -r requirements.txt
+```
+
+### 3. Configure Environment Variables
+
+```bash
+# Copy the example environment file
 cp .env.example .env
+
+# Edit .env with your API keys
+nano .env  # or use any text editor
 ```
 
-### Setup with an existing Conda env (example: personal)
-```
-cd backend
-conda activate personal
-pip install -e .
-cp .env.example .env
-```
+**Required API Keys:**
+- `GEMINI_API_KEY` - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
-### Local Postgres (single DB mode)
-1. Install and run Postgres locally.
-2. Create a database and user (example commands):
-   ```
-   createuser -P trip_user
-   createdb -O trip_user trip_planner
-   ```
-3. Update `backend/.env`:
-   ```
-   TRIP_DATABASE_URL=postgresql+asyncpg://trip_user:your_password@localhost:5432/trip_planner
-   TRIP_REDIS_URL=
-   ```
-4. Run migrations:
-   ```
-   alembic upgrade head
-   ```
+**Optional API Keys (app works without these using stub data):**
+- `OPENWEATHER_API_KEY` - Get from [OpenWeather](https://openweathermap.org/api)
+- `GOOGLE_PLACES_API_KEY` - Get from [Google Cloud Console](https://console.cloud.google.com/)
+- `DISTANCE_MATRIX_API_KEY` - Same as Google Places or separate key
+- `CURRENCY_API_KEY` - Get from [ExchangeRate API](https://exchangerate.host/)
 
-### Migrations
-```
-alembic upgrade head
+### 4. Initialize Database
+
+```bash
+# Run migrations to create database tables
+python manage.py migrate
+
+# Create cache table (if not using Redis)
+python manage.py createcachetable
 ```
 
-### Run
-```
-uvicorn app.main:app --reload
-```
+### 5. Run Development Server
 
-### Development install options
-- `pip install -e .` for editable install
-- `pip install -e ".[dev]"` for dev/test tooling
-- `pip install .` for a regular install
-
-### Environment variables
-```
-TRIP_DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/trips
-TRIP_REDIS_URL=
-TRIP_GEMINI_API_KEY=your_key
-TRIP_GEMINI_MODEL=gemini-1.5-flash
-TRIP_OPENWEATHER_API_KEY=your_key
-TRIP_GOOGLE_PLACES_API_KEY=your_key
-TRIP_DISTANCE_MATRIX_API_KEY=your_key
-TRIP_CURRENCY_API_KEY=your_key
+```bash
+python manage.py runserver
 ```
 
-### API Endpoints
-- `POST /api/itineraries/generate` - synchronous generation
-- `POST /api/itineraries` - async queue (BackgroundTasks)
-- `GET /api/itineraries/{id}` - retrieve itinerary
-- `GET /api/itineraries/{id}/ics` - download calendar
+The API will be available at `http://localhost:8000`
 
-### Sample request
-```
-POST /api/itineraries/generate
-{
-  "destination": "Lisbon, Portugal",
-  "start_date": "2026-03-10",
-  "end_date": "2026-03-12",
-  "travelers": { "adults": 2, "children": 0 },
-  "origin_location": "San Francisco, CA",
-  "food_preferences": {
-    "cuisines": ["seafood", "portuguese"],
-    "dietary_restrictions": ["vegetarian"],
-    "avoid_ingredients": ["peanuts"]
-  },
-  "activity_preferences": {
-    "interests": ["history", "food", "nightlife"],
-    "pace": "moderate",
-    "accessibility_needs": []
-  },
-  "lodging_preferences": {
-    "lodging_type": "hotel",
-    "max_distance_km_from_center": 4
-  },
-  "budget": { "currency": "USD", "total_budget": 1800, "comfort_level": "midrange" },
-  "daily_start_time": "09:00:00",
-  "daily_end_time": "20:00:00",
-  "notes": "Anniversary trip, prefer walkable areas."
-}
-```
+## API Endpoints
 
-## Frontend (Next.js)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/itineraries/` | Queue async generation |
+| POST | `/api/itineraries/generate` | Generate itinerary (sync) |
+| GET | `/api/itineraries/<id>/` | Get itinerary |
+| PATCH | `/api/itineraries/<id>/` | Update itinerary |
+| GET | `/api/itineraries/<id>/ics` | Download ICS calendar |
+| POST | `/api/analysis/image` | Analyze travel image |
+| POST | `/api/edit/block` | Edit schedule block |
 
-### Setup
-```
-cd frontend
-npm install
+## Example Request
+
+```bash
+curl -X POST http://localhost:8000/api/itineraries/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "destination": "Tokyo, Japan",
+    "start_date": "2026-04-01",
+    "end_date": "2026-04-05",
+    "travelers": {"adults": 2, "children": 0},
+    "budget": {
+      "currency": "USD",
+      "total_budget": 3000,
+      "comfort_level": "midrange"
+    },
+    "activity_preferences": {
+      "interests": ["culture", "food", "history"],
+      "pace": "moderate"
+    }
+  }'
 ```
 
-### Run
+## Agent Architecture
+
+The system uses 8 specialized agents coordinated by an orchestrator:
+
+1. **ResearchAgent** - Researches accommodation and transport options
+2. **PlannerAgent** - Creates day-by-day skeleton plans
+3. **WeatherAgent** - Fetches weather and suggests adjustments
+4. **AttractionsAgent** - Finds and ranks attractions
+5. **SchedulerAgent** - Converts plans to timed schedules
+6. **FoodAgent** - Plans meals aligned with schedule
+7. **BudgetAgent** - Calculates costs and suggests optimizations
+8. **ValidatorAgent** - Validates schedule consistency
+
+## Development
+
+```bash
+# Run tests
+pytest
+
+# Create superuser for admin
+python manage.py createsuperuser
+
+# Access admin at http://localhost:8000/admin/
 ```
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000 npm run dev
-```
 
-## Getting API keys
+## Production Deployment
 
-The app works without API keys (uses safe stubs), but results improve with keys.
-
-### Where to put keys
-Set keys in `backend/.env` (copied from `backend/.env.example`).
-
-Tip: never commit real keys. Rotate keys if they have been exposed.
-
-### Gemini (required for full LLM planning)
-1. Go to Google AI Studio: https://aistudio.google.com/app/apikey
-2. Create an API key.
-3. Set `TRIP_GEMINI_API_KEY` in `backend/.env`.
-
-### OpenWeather (forecast)
-1. Create an account: https://home.openweathermap.org/users/sign_up
-2. Generate an API key: https://home.openweathermap.org/api_keys
-3. Set `TRIP_OPENWEATHER_API_KEY`.
-
-### Google Places API (attractions)
-1. Create a Google Cloud project: https://console.cloud.google.com/
-2. Enable Places API: https://console.cloud.google.com/apis/library/places-backend.googleapis.com
-3. Create an API key: https://console.cloud.google.com/apis/credentials
-4. Set `TRIP_GOOGLE_PLACES_API_KEY`.
-
-### Google Distance Matrix (travel time)
-1. Enable Distance Matrix API: https://console.cloud.google.com/apis/library/distance-matrix-backend.googleapis.com
-2. Create an API key: https://console.cloud.google.com/apis/credentials
-3. Set `TRIP_DISTANCE_MATRIX_API_KEY`.
-4. If missing, the backend will use OSRM (public) for coordinate-based routes.
-
-### Currency conversion (optional)
-1. Sign up for a currency provider (example: https://exchangerate.host/).
-2. Set `TRIP_CURRENCY_API_KEY` if required by your provider.
-3. If missing, the backend uses a 1:1 fallback.
-
-## Notes
-- All external API calls are cached in Postgres with TTL and optionally Redis.
-- Gemini responses are strictly validated by Pydantic v2 with JSON repair retries.
-- Agent traces (drafts/issues/final) are persisted per itinerary.
+1. Set `DJANGO_DEBUG=False`
+2. Set a secure `DJANGO_SECRET_KEY`
+3. Configure `DATABASE_URL` for PostgreSQL
+4. Set `DJANGO_ALLOWED_HOSTS` appropriately
+5. Use Gunicorn: `gunicorn trip_planner.wsgi:application`

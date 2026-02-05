@@ -1,0 +1,145 @@
+"""
+Google Gemini AI client.
+"""
+import json
+import logging
+from typing import Any, Optional
+
+import google.generativeai as genai
+from django.conf import settings
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from trip_planner.core.exceptions import GeminiError
+from trip_planner.core.utils import best_effort_json
+
+logger = logging.getLogger(__name__)
+
+
+class GeminiClient:
+    """Client for Google Gemini AI API."""
+    
+    _instance = None
+    
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+            cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self):
+        if self._initialized:
+            return
+        
+        api_key = settings.GEMINI_API_KEY
+        if not api_key:
+            logger.warning("Gemini API key not configured")
+            self.model = None
+            self._initialized = True
+            return
+        
+        try:
+            genai.configure(api_key=api_key)
+            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self._initialized = True
+            logger.info(f"Gemini initialized: {settings.GEMINI_MODEL}")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini: {e}")
+            self.model = None
+            self._initialized = True
+    
+    @property
+    def is_available(self) -> bool:
+        return self.model is not None
+    
+    @retry(wait=wait_exponential(multiplier=1, min=2, max=8), stop=stop_after_attempt(3), reraise=True)
+    def generate_content(self, prompt: str, schema: dict = None) -> str:
+        """Generate content with optional JSON schema guidance."""
+        if not self.is_available:
+            raise GeminiError("Gemini not available")
+        
+        try:
+            response = self.model.generate_content(
+                prompt,
+                generation_config={
+                    "response_mime_type": "application/json",
+                    "response_schema": schema,
+                    "temperature": 0.4,
+                },
+            )
+            return response.text or ""
+        except Exception as e:
+            # Try without schema
+            logger.warning(f"Schema-guided generation failed: {e}")
+            try:
+                response = self.model.generate_content(
+                    prompt,
+                    generation_config={
+                        "response_mime_type": "application/json",
+                        "temperature": 0.4,
+                    },
+                )
+                return response.text or ""
+            except Exception as inner:
+                raise GeminiError(str(inner))
+    
+    def generate_from_image(self, image_bytes: bytes, prompt: str) -> str:
+        """Generate content from image using Gemini Vision."""
+        if not self.is_available:
+            raise GeminiError("Gemini not available")
+        
+        import PIL.Image
+        import io
+        
+        try:
+            image = PIL.Image.open(io.BytesIO(image_bytes))
+            response = self.model.generate_content([prompt, image])
+            return response.text
+        except Exception as e:
+            raise GeminiError(f"Image analysis failed: {e}")
+
+
+def render_prompt(system: str, user: str, schema: dict) -> str:
+    """Render a complete prompt with schema."""
+    schema_json = json.dumps(schema, indent=2)
+    return (
+        f"{system}\n\n"
+        f"USER REQUEST:\n{user}\n\n"
+        "Return ONLY valid JSON matching this schema:\n"
+        f"{schema_json}\n"
+    )
+
+
+def generate_validated(client: GeminiClient, system_prompt: str, 
+                       user_prompt: str, schema: dict) -> tuple[dict, list, list]:
+    """Generate and validate JSON content."""
+    issues = []
+    drafts = []
+    
+    prompt = render_prompt(system_prompt, user_prompt, schema)
+    
+    try:
+        raw = client.generate_content(prompt, schema)
+        drafts.append(raw)
+        
+        try:
+            return best_effort_json(raw), drafts, issues
+        except Exception as e:
+            issues.append(f"validation_failed: {e}")
+        
+        # Repair attempt
+        repair_prompt = (
+            f"Fix this invalid JSON to match the schema:\n{raw}\n\n"
+            f"Schema:\n{json.dumps(schema, indent=2)}\n\n"
+            "Return ONLY valid JSON."
+        )
+        repaired = client.generate_content(repair_prompt, schema)
+        drafts.append(repaired)
+        return best_effort_json(repaired), drafts, issues
+        
+    except Exception as e:
+        issues.append(f"generation_failed: {e}")
+        raise GeminiError(f"Failed to generate content: {e}")
+
+
+# Singleton instance
+gemini_client = GeminiClient()
