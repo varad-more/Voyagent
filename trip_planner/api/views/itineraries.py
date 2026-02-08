@@ -11,6 +11,7 @@ from trip_planner.models import Itinerary, ItineraryStatus
 from trip_planner.api.serializers import TripRequestSerializer, ItinerarySerializer
 from trip_planner.services.orchestrator import generate_itinerary
 from trip_planner.core.utils import build_ics
+from trip_planner.core.exceptions import GeminiError
 
 logger = logging.getLogger(__name__)
 
@@ -52,6 +53,13 @@ class ItineraryGenerateView(APIView):
             result = generate_itinerary(trip_data, itinerary)
             itinerary.mark_completed(result)
             return Response(result)
+        except GeminiError as e:
+            logger.error(f"Gemini API error: {e}")
+            itinerary.mark_failed(str(e))
+            return Response(
+                {"error": "gemini_error", "message": str(e), "code": "gemini_not_configured"},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
+            )
         except Exception as e:
             logger.exception(f"Generation failed: {e}")
             itinerary.mark_failed(str(e))

@@ -10,6 +10,7 @@ from trip_planner.agents import (
 )
 from trip_planner.services.gemini import gemini_client
 from trip_planner.models import AgentTrace
+from trip_planner.core.exceptions import GeminiError
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +51,9 @@ def generate_itinerary(trip: dict, itinerary) -> dict:
     logger.info(f"Starting generation for {trip.get('destination')}")
     
     client = gemini_client if gemini_client.is_available else None
+    if not client:
+        reason = getattr(gemini_client, "_error_reason", "Gemini API key not configured")
+        raise GeminiError(reason)
     
     # Initialize agents
     planner = PlannerAgent(client)

@@ -34,6 +34,7 @@ class GeminiClient:
         if not api_key:
             logger.warning("Gemini API key not configured")
             self.model = None
+            self._error_reason = "Gemini API key not configured. Please check your .env file."
             self._initialized = True
             return
         
@@ -41,10 +42,12 @@ class GeminiClient:
             genai.configure(api_key=api_key)
             self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
             self._initialized = True
+            self._error_reason = None
             logger.info(f"Gemini initialized: {settings.GEMINI_MODEL}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
             self.model = None
+            self._error_reason = f"Gemini initialization failed: {str(e)}"
             self._initialized = True
     
     @property
@@ -55,7 +58,8 @@ class GeminiClient:
     def generate_content(self, prompt: str, schema: dict = None) -> str:
         """Generate content with optional JSON schema guidance."""
         if not self.is_available:
-            raise GeminiError("Gemini not available")
+            reason = getattr(self, "_error_reason", "Gemini not available")
+            raise GeminiError(reason)
         
         try:
             response = self.model.generate_content(

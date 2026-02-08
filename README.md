@@ -86,6 +86,76 @@ cp .env.example .env
 nano .env  # or use any text editor
 ```
 
+### How to Generate API Keys
+
+#### 1. Google Gemini API (Required)
+The application uses Google's Gemini models for all AI reasoning and content generation.
+1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey).
+2. Click on "Create API key".
+3. Select an existing Google Cloud project or create a new one.
+4. Copy the generated API key and paste it as `GEMINI_API_KEY` in your `.env` file.
+
+#### 2. OpenWeather API (Optional)
+Used for real-time weather forecasts logic.
+1. Sign up at [OpenWeather](https://openweathermap.org/api).
+2. Go to your API keys tab.
+3. Generate a new key.
+4. Paste it as `OPENWEATHER_API_KEY` in your `.env` file.
+
+#### 3. Google Maps Platform (Optional but Recommended)
+Used for retrieving place details (ratings, photos, descriptions) and calculating precise travel times.
+
+**Prerequisites:**
+- A Google Cloud Platform (GCP) Account.
+- A Billing Account linked to your GCP project (Required by Google, even for free tier).
+
+**Step-by-Step Setup:**
+
+1.  **Create a Project:**
+    -   Go to the [Google Cloud Console](https://console.cloud.google.com/).
+    -   Click the project dropdown at the top and select **"New Project"**.
+    -   Give it a name (e.g., "Trip Planner API") and click **Create**.
+
+2.  **Enable APIs:**
+    -   In the sidebar, go to **APIs & Services** > **Library**.
+    -   Search for and enable the following **specific** APIs:
+        -   **Places API (New)**: *Make sure to select the "New" version if available, or just "Places API". This is used for searching places and fetching details.*
+        -   **Distance Matrix API**: *Used to calculate travel times between locations.*
+    -   *Note: You may need to enable "Maps JavaScript API" if you plan to extend the frontend with interactive maps later, but it's not strictly required for the current backend logic.*
+
+3.  **Create Credentials:**
+    -   Go to **APIs & Services** > **Credentials**.
+    -   Click **+ CREATE CREDENTIALS** > **API key**.
+    -   Copy the generated key.
+
+4.  **Configure Environment:**
+    -   Open your `.env` file.
+    -   Paste the key for both variables (unless you want to use separate keys for quota management):
+        ```env
+        GOOGLE_PLACES_API_KEY=your_api_key_here
+        DISTANCE_MATRIX_API_KEY=your_api_key_here
+        ```
+
+5.  **Security (Highly Recommended):**
+    -   In the Google Cloud Console, click on your newly created API key to edit its settings.
+    -   Under **API restrictions**, select **Restrict key**.
+    -   Check **Places API** and **Distance Matrix API**. This prevents unauthorized use of your key for other services.
+    -   Save changes.
+
+**Troubleshooting:**
+-   **"Request Denied" / "Billing Not Enabled":** Ensure your billing account is active and linked to the project.
+-   **"API Not Enabled":** Double-check that you enabled the specific APIs listed above in the "Library" section.
+-   **Fallbacks:**
+    -   If `GOOGLE_PLACES_API_KEY` is missing/invalid, the app uses built-in "stub" (mock) data for attractions and hotels, so you can still test the UI.
+    -   If `DISTANCE_MATRIX_API_KEY` is missing/invalid, the app falls back to **OSRM (Open Source Routing Machine)** for travel times, which is free and requires no key.
+
+#### 4. ExchangeRate API (Optional)
+Used for currency conversion if you plan trips in different currencies.
+1. Go to [ExchangeRate-API](https://www.exchangerate-api.com/).
+2. Sign up for a free key.
+3. Copy your API key.
+4. Paste it as `CURRENCY_API_KEY` in your `.env` file.
+
 **Required API Keys:**
 - `GEMINI_API_KEY` - Get from [Google AI Studio](https://makersuite.google.com/app/apikey)
 
@@ -94,6 +164,17 @@ nano .env  # or use any text editor
 - `GOOGLE_PLACES_API_KEY` - Get from [Google Cloud Console](https://console.cloud.google.com/)
 - `DISTANCE_MATRIX_API_KEY` - Same as Google Places or separate key
 - `CURRENCY_API_KEY` - Get from [ExchangeRate API](https://exchangerate.host/)
+
+- `CURRENCY_API_KEY` - Get from [ExchangeRate API](https://exchangerate.host/)
+
+### Testing API Keys
+You can validate your API key configuration using the included test script:
+
+```bash
+python manage.py test_keys
+```
+
+This command will attempt to make a small request to each configured service and report whether the key is valid, missing, or invalid.
 
 ### 4. Initialize Database
 

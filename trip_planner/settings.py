@@ -46,7 +46,7 @@ ROOT_URLCONF = "trip_planner.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "trip_planner" / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -92,6 +92,9 @@ USE_TZ = True
 # Static files
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    BASE_DIR / "trip_planner" / "static",
+]
 
 # Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
