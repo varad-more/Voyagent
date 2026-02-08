@@ -1,0 +1,396 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Floating decorative icons -->
+<div class="floating-icons">
+    <div class="floating-icon" style="top: 15%; left: 10%; font-size: 2.5rem; opacity: 0.2; animation-delay: 0s;">✈️
+    </div>
+    <div class="floating-icon" style="top: 25%; right: 10%; font-size: 2rem; opacity: 0.15; animation-delay: 2s;">🗺️
+    </div>
+    <div class="floating-icon" style="top: 60%; right: 5%; font-size: 2.5rem; opacity: 0.15; animation-delay: 1.5s;">🌍
+    </div>
+    <div class="floating-icon" style="bottom: 15%; right: 15%; font-size: 2rem; opacity: 0.2; animation-delay: 3s;">🎒
+    </div>
+    <div class="floating-icon" style="top: 40%; left: 3%; font-size: 2rem; opacity: 0.15; animation-delay: 2.5s;">🏔️
+    </div>
+</div>
+
+<main class="main-content">
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="hero-glow animate-glow"></div>
+
+        <!-- AI Badge -->
+        <div class="ai-badge animate-fadeIn">
+            <span class="pulse-dot">
+                <span class="ping"></span>
+                <span class="dot"></span>
+            </span>
+            <span class="badge-text">AI-Powered Trip Planning</span>
+            <span>✨</span>
+        </div>
+
+        <!-- Main heading -->
+        <h1>
+            <span>Discover Your</span>
+            <br>
+            <span class="hero-gradient">Dream Destination</span>
+        </h1>
+
+        <!-- Subtitle -->
+        <p>
+            Let AI craft your <span class="highlight-purple">perfect itinerary</span> with
+            real-time weather, smart scheduling, and personalized recommendations —
+            all in <span class="highlight-blue">minutes</span>.
+        </p>
+
+        <!-- Feature cards -->
+        <div class="feature-cards">
+            <span class="feature-card weather">
+                <span class="icon">🌤️</span>
+                <span>Weather-Aware</span>
+            </span>
+            <span class="feature-card routing">
+                <span class="icon">📍</span>
+                <span>Smart Routing</span>
+            </span>
+            <span class="feature-card budget">
+                <span class="icon">💰</span>
+                <span>Budget Planning</span>
+            </span>
+            <span class="feature-card ai">
+                <span class="icon">✨</span>
+                <span>AI Personalized</span>
+            </span>
+        </div>
+    </header>
+
+    <!-- Form Section -->
+    <section id="form-section">
+        <form id="trip-form" class="animate-fadeIn">
+            <!-- Destination & Dates -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper purple">📍</div>
+                    <div>
+                        <h3>Where & When</h3>
+                        <p>Choose your destination and travel dates</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <!-- Trip Type Toggle -->
+                    <div class="trip-type-toggle">
+                        <button type="button" class="type-btn active" id="type-single"
+                            onclick="toggleTripType('single')">Single Destination</button>
+                        <button type="button" class="type-btn" id="type-multi"
+                            onclick="toggleTripType('multi')">Multi-City Road Trip</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Destinations</label>
+                        <div id="destinations-container">
+                            <div class="destination-row">
+                                <span class="input-icon">1</span>
+                                <input type="text" name="destination[]" class="destination-input"
+                                    placeholder="e.g., Tokyo, Japan" required>
+                            </div>
+                        </div>
+                        <button type="button" id="add-dest-btn" class="btn-text hidden" onclick="addDestinationInput()">
+                            <span>+</span> Add Another Stop
+                        </button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="origin">Origin (Optional)</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🏠</span>
+                            <input type="text" id="origin" name="origin" placeholder="e.g., New York, USA">
+                        </div>
+                    </div>
+
+                    <div class="form-grid cols-2">
+                        <div class="form-group">
+                            <label for="start_date">Start Date</label>
+                            <input type="date" id="start_date" name="start_date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="end_date">End Date</label>
+                            <input type="date" id="end_date" name="end_date" required>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Travelers -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper blue">👥</div>
+                    <div>
+                        <h3>Travelers</h3>
+                        <p>Who's joining the adventure?</p>
+                    </div>
+                </div>
+
+                <div class="form-grid cols-2">
+                    <div class="form-group">
+                        <label>Adults</label>
+                        <div class="number-stepper">
+                            <button type="button" onclick="adjustNumber('adults', -1)">−</button>
+                            <input type="number" id="adults" name="adults" value="2" min="1" max="10">
+                            <button type="button" onclick="adjustNumber('adults', 1)">+</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Children</label>
+                        <div class="number-stepper">
+                            <button type="button" onclick="adjustNumber('children', -1)">−</button>
+                            <input type="number" id="children" name="children" value="0" min="0" max="10">
+                            <button type="button" onclick="adjustNumber('children', 1)">+</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Budget -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper emerald">💰</div>
+                    <div>
+                        <h3>Budget</h3>
+                        <p>Set your spending limits</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-grid cols-2">
+                        <div class="form-group">
+                            <label for="currency">Currency</label>
+                            <select id="currency" name="currency">
+                                <option value="USD">🇺🇸 USD</option>
+                                <option value="EUR">🇪🇺 EUR</option>
+                                <option value="GBP">🇬🇧 GBP</option>
+                                <option value="JPY">🇯🇵 JPY</option>
+                                <option value="INR">🇮🇳 INR</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="total_budget">Total Budget</label>
+                            <input type="number" id="total_budget" name="total_budget" value="3000" min="100"
+                                step="100">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="comfort_level">Comfort Level</label>
+                        <select id="comfort_level" name="comfort_level">
+                            <option value="budget">🎒 Budget - Hostels, street food, public transport</option>
+                            <option value="midrange" selected>🏨 Midrange - Hotels, restaurants, some taxis</option>
+                            <option value="luxury">💎 Luxury - Premium hotels, fine dining, private transfers</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Activity Preferences -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper orange">🎯</div>
+                    <div>
+                        <h3>Interests & Preferences</h3>
+                        <p>What kind of experiences are you looking for?</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Interests (click to select)</label>
+                        <div class="toggle-group" id="interests-group">
+                            <button type="button" class="toggle-btn" data-value="culture">🏛️ Culture</button>
+                            <button type="button" class="toggle-btn" data-value="food">🍜 Food</button>
+                            <button type="button" class="toggle-btn" data-value="history">📚 History</button>
+                            <button type="button" class="toggle-btn" data-value="nature">🌿 Nature</button>
+                            <button type="button" class="toggle-btn" data-value="adventure">🧗 Adventure</button>
+                            <button type="button" class="toggle-btn" data-value="nightlife">🌙 Nightlife</button>
+                            <button type="button" class="toggle-btn" data-value="shopping">🛍️ Shopping</button>
+                            <button type="button" class="toggle-btn" data-value="art">🎨 Art</button>
+                            <button type="button" class="toggle-btn" data-value="relaxation">🧘 Relaxation</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="pace">Travel Pace</label>
+                        <select id="pace" name="pace">
+                            <option value="slow">🐢 Slow - Few activities, lots of downtime</option>
+                            <option value="moderate" selected>🚶 Moderate - Balanced activities and rest</option>
+                            <option value="fast">🏃 Fast - Pack in as much as possible</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Food Preferences -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper orange">🍽️</div>
+                    <div>
+                        <h3>Dining Preferences</h3>
+                        <p>Any food preferences or restrictions?</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Cuisines (click to select)</label>
+                        <div class="toggle-group" id="cuisines-group">
+                            <button type="button" class="toggle-btn" data-value="local">🏠 Local</button>
+                            <button type="button" class="toggle-btn" data-value="asian">🍜 Asian</button>
+                            <button type="button" class="toggle-btn" data-value="western">🍝 Western</button>
+                            <button type="button" class="toggle-btn" data-value="street_food">🥡 Street Food</button>
+                            <button type="button" class="toggle-btn" data-value="fine_dining">🍷 Fine Dining</button>
+                            <button type="button" class="toggle-btn" data-value="vegetarian">🥗 Vegetarian</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Dietary Restrictions (click to select)</label>
+                        <div class="toggle-group" id="dietary-group">
+                            <button type="button" class="toggle-btn" data-value="vegetarian">🥬 Vegetarian</button>
+                            <button type="button" class="toggle-btn" data-value="vegan">🌱 Vegan</button>
+                            <button type="button" class="toggle-btn" data-value="halal">☪️ Halal</button>
+                            <button type="button" class="toggle-btn" data-value="kosher">✡️ Kosher</button>
+                            <button type="button" class="toggle-btn" data-value="gluten_free">🌾 Gluten-Free</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accommodation -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper purple">🏨</div>
+                    <div>
+                        <h3>Accommodation</h3>
+                        <p>Where would you like to stay?</p>
+                    </div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="lodging_type">Accommodation Type</label>
+                        <select id="lodging_type" name="lodging_type">
+                            <option value="any">🏨 Any Type</option>
+                            <option value="hotel">🏢 Hotel</option>
+                            <option value="hostel">🛏️ Hostel</option>
+                            <option value="apartment">🏠 Apartment</option>
+                            <option value="boutique">💎 Boutique</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Max Distance from City Center</label>
+                        <div class="range-wrapper">
+                            <input type="range" id="max_distance" name="max_distance" min="1" max="20" value="5">
+                            <span class="range-value" id="distance-value">5 km</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Schedule -->
+            <div class="glass-card">
+                <div class="section-header">
+                    <div class="icon-wrapper blue">⏰</div>
+                    <div>
+                        <h3>Daily Schedule</h3>
+                        <p>When do you like to start and end your days?</p>
+                    </div>
+                </div>
+
+                <div class="form-grid cols-2">
+                    <div class="form-group">
+                        <label for="daily_start">Start Time</label>
+                        <input type="time" id="daily_start" name="daily_start" value="09:00">
+                    </div>
+                    <div class="form-group">
+                        <label for="daily_end">End Time</label>
+                        <input type="time" id="daily_end" name="daily_end" value="20:00">
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                    <label for="notes">Additional Notes</label>
+                    <textarea id="notes" name="notes"
+                        placeholder="Any special requests, celebrations, must-sees, or accessibility needs..."></textarea>
+                </div>
+            </div>
+
+            <!-- Submit -->
+            <button type="submit" class="btn-submit" id="submit-btn">
+                <span>▶</span>
+                <span>Generate My Itinerary</span>
+                <span class="shimmer"></span>
+            </button>
+        </form>
+
+        <!-- Test Data & Demo buttons -->
+        <div class="test-buttons-container">
+            <button type="button" class="demo-link fill-test-btn" id="fill-test-btn">
+                <span>🧪</span>
+                <span>Fill Test Data</span>
+            </button>
+            <button type="button" class="demo-link" id="demo-btn">
+                <span>👀</span>
+                <span>Preview with Demo Data</span>
+            </button>
+        </div>
+    </section>
+
+    <!-- Loading State -->
+    <section id="loading-section" class="hidden">
+        <div class="loading-container animate-fadeIn">
+            <div class="loading-card">
+                <div class="loading-spinner">
+                    <div class="ring outer"></div>
+                    <div class="ring inner"></div>
+                    <div class="ring reverse"></div>
+                    <span class="center-icon">✈️</span>
+                </div>
+                <div class="loading-text">
+                    <h3>Crafting your adventure...</h3>
+                    <p>Our AI is planning the perfect trip for you</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Error State -->
+    <section id="error-section" class="hidden">
+        <div class="error-container animate-fadeIn">
+            <div class="error-content">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text">
+                    <h3>Oops! Something went wrong</h3>
+                    <p id="error-message">An unexpected error occurred.</p>
+                    <button type="button" id="retry-btn">← Try Again</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Result Section -->
+    <section id="result-section" class="hidden">
+        <!-- Dynamically populated by JavaScript -->
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="powered-by">
+            <span>Powered by</span>
+            <span class="gemini">Gemini AI</span>
+            <span>•</span>
+            <span>Built with 💜 for travelers</span>
+        </div>
+    </footer>
+</main>
+{% endblock %}
