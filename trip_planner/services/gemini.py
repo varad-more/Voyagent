@@ -1,11 +1,9 @@
-"""
-Google Gemini AI client.
-"""
-import json
+
 import logging
 from typing import Any, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from django.conf import settings
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -33,26 +31,26 @@ class GeminiClient:
         api_key = settings.GEMINI_API_KEY
         if not api_key:
             logger.warning("Gemini API key not configured")
-            self.model = None
+            self.client = None
             self._error_reason = "Gemini API key not configured. Please check your .env file."
             self._initialized = True
             return
         
         try:
-            genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel(settings.GEMINI_MODEL)
+            self.client = genai.Client(api_key=api_key)
+            self.model_name = settings.GEMINI_MODEL
             self._initialized = True
             self._error_reason = None
             logger.info(f"Gemini initialized: {settings.GEMINI_MODEL}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
-            self.model = None
+            self.client = None
             self._error_reason = f"Gemini initialization failed: {str(e)}"
             self._initialized = True
     
     @property
     def is_available(self) -> bool:
-        return self.model is not None
+        return self.client is not None
     
     @retry(wait=wait_exponential(multiplier=1, min=2, max=8), stop=stop_after_attempt(3), reraise=True)
     def generate_content(self, prompt: str, schema: dict = None) -> str:
@@ -62,29 +60,39 @@ class GeminiClient:
             raise GeminiError(reason)
         
         try:
-            response = self.model.generate_content(
-                prompt,
-                generation_config={
-                    "response_mime_type": "application/json",
-                    "response_schema": schema,
-                    "temperature": 0.4,
-                },
+            config = types.GenerateContentConfig(
+                temperature=0.4,
+                response_mime_type="application/json",
+                response_schema=schema,
+            ) if schema else types.GenerateContentConfig(
+                temperature=0.4,
+                response_mime_type="application/json",
+            )
+
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=prompt,
+                config=config,
             )
             return response.text or ""
         except Exception as e:
-            # Try without schema
-            logger.warning(f"Schema-guided generation failed: {e}")
-            try:
-                response = self.model.generate_content(
-                    prompt,
-                    generation_config={
-                        "response_mime_type": "application/json",
-                        "temperature": 0.4,
-                    },
-                )
-                return response.text or ""
-            except Exception as inner:
-                raise GeminiError(str(inner))
+            # Try without schema if it fails
+            if schema:
+                logger.warning(f"Schema-guided generation failed: {e}")
+                try:
+                    config = types.GenerateContentConfig(
+                        temperature=0.4,
+                        response_mime_type="application/json",
+                    )
+                    response = self.client.models.generate_content(
+                        model=self.model_name,
+                        contents=prompt,
+                        config=config,
+                    )
+                    return response.text or ""
+                except Exception as inner:
+                    raise GeminiError(str(inner))
+            raise GeminiError(str(e))
     
     def generate_from_image(self, image_bytes: bytes, prompt: str) -> str:
         """Generate content from image using Gemini Vision."""
@@ -96,7 +104,10 @@ class GeminiClient:
         
         try:
             image = PIL.Image.open(io.BytesIO(image_bytes))
-            response = self.model.generate_content([prompt, image])
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=[prompt, image]
+            )
             return response.text
         except Exception as e:
             raise GeminiError(f"Image analysis failed: {e}")

@@ -15,16 +15,33 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('  [SKIPPED] GEMINI_API_KEY not configured'))
         else:
             try:
-                import google.generativeai as genai
-                genai.configure(api_key=settings.GEMINI_API_KEY)
-                model = genai.GenerativeModel('gemini-1.5-flash')
-                response = model.generate_content('Hello, are you working?')
+                from google import genai
+                from google.genai import types
+                
+                # Check for model configuration
+                model_name = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
+                self.stdout.write(f"  Attempting to use model: {model_name}")
+                
+                client = genai.Client(api_key=settings.GEMINI_API_KEY)
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents='Hello, are you working?'
+                )
                 if response.text:
-                    self.stdout.write(self.style.SUCCESS('  [SUCCESS] Gemini API is working'))
+                    self.stdout.write(self.style.SUCCESS(f'  [SUCCESS] Gemini API is working (Model: {model_name})'))
                 else:
                     self.stdout.write(self.style.ERROR('  [FAILED] Gemini API returned empty response'))
+                    
+            except ImportError:
+                self.stdout.write(self.style.ERROR('  [FAILED] google-genai library not found. Please install requirements.txt'))
             except Exception as e:
-                self.stdout.write(self.style.ERROR(f'  [FAILED] Gemini API error: {e}'))
+                error_msg = str(e)
+                if "404" in error_msg:
+                    self.stdout.write(self.style.ERROR(f'  [FAILED] Model {model_name} not found or not supported. Check GEMINI_MODEL in .env'))
+                elif "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                    self.stdout.write(self.style.WARNING(f'  [WARNING] Quota exceeded for model {model_name}. API key is valid but rate limited.'))
+                else:
+                    self.stdout.write(self.style.ERROR(f'  [FAILED] Gemini API error: {e}'))
 
         # 2. OpenWeather API
         self.stdout.write('\nChecking OpenWeather API Key...')

@@ -90,10 +90,37 @@ nano .env  # or use any text editor
 
 #### 1. Google Gemini API (Required)
 The application uses Google's Gemini models for all AI reasoning and content generation.
+
+**Setup:**
 1. Go to [Google AI Studio](https://makersuite.google.com/app/apikey).
 2. Click on "Create API key".
 3. Select an existing Google Cloud project or create a new one.
 4. Copy the generated API key and paste it as `GEMINI_API_KEY` in your `.env` file.
+5. Set `GEMINI_MODEL` to one of the supported models (see table below).
+
+**Available Models:**
+
+| Model ID | Description | Best For |
+|----------|-------------|----------|
+| `gemini-2.0-flash` | Latest, fastest model (Recommended) | General use, best balance of speed and quality |
+| `gemini-2.0-flash-lite` | Lightweight version of 2.0 | Lower latency, reduced cost |
+| `gemini-2.5-flash` | Next-gen flash model | Advanced reasoning with speed |
+| `gemini-2.5-pro` | Most capable model | Complex tasks requiring high accuracy |
+
+> [!NOTE]
+> Older models like `gemini-1.5-flash` and `gemini-pro` have been deprecated and may return `404 NOT_FOUND` errors. Use `gemini-2.0-flash` or newer.
+
+**Check Available Models:**
+
+To see all available models and your current configuration:
+```bash
+python manage.py list_models
+```
+
+To validate that your configured model works:
+```bash
+python manage.py list_models --check
+```
 
 #### 2. OpenWeather API (Optional)
 Used for real-time weather forecasts logic.

@@ -120,7 +120,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # API Keys
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-1.5-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
 OPENWEATHER_API_KEY = os.environ.get("OPENWEATHER_API_KEY", "")
 GOOGLE_PLACES_API_KEY = os.environ.get("GOOGLE_PLACES_API_KEY", "")
 DISTANCE_MATRIX_API_KEY = os.environ.get("DISTANCE_MATRIX_API_KEY", "")
