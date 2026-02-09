@@ -536,13 +536,106 @@ textarea::placeholder {
   color: var(--color-slate-500);
 }
 
-/* Date/time color scheme */
-input[type="date"],
+/* Flatpickr dark theme customizations */
+.flatpickr-calendar {
+  background: rgba(15, 23, 42, 0.95) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5), 0 0 30px rgba(139, 92, 246, 0.2) !important;
+  backdrop-filter: blur(20px);
+}
+
+.flatpickr-calendar.arrowTop::before,
+.flatpickr-calendar.arrowTop::after {
+  border-bottom-color: rgba(139, 92, 246, 0.3) !important;
+}
+
+.flatpickr-months {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2)) !important;
+  border-radius: 1rem 1rem 0 0 !important;
+  padding: 0.5rem 0;
+}
+
+.flatpickr-months .flatpickr-month {
+  color: white !important;
+}
+
+.flatpickr-current-month {
+  color: white !important;
+  font-weight: 600;
+}
+
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+  background: transparent !important;
+  color: white !important;
+}
+
+.flatpickr-current-month input.cur-year {
+  color: white !important;
+}
+
+.flatpickr-weekdays {
+  background: transparent !important;
+}
+
+.flatpickr-weekday {
+  color: var(--color-purple-400) !important;
+  font-weight: 600;
+}
+
+.flatpickr-day {
+  color: var(--color-slate-300) !important;
+  border-radius: 0.5rem !important;
+  transition: all 0.2s ease !important;
+}
+
+.flatpickr-day:hover {
+  background: rgba(139, 92, 246, 0.3) !important;
+  border-color: rgba(139, 92, 246, 0.5) !important;
+}
+
+.flatpickr-day.today {
+  border-color: var(--color-purple-400) !important;
+}
+
+.flatpickr-day.selected {
+  background: linear-gradient(135deg, var(--color-purple-500), var(--color-blue-500)) !important;
+  border-color: transparent !important;
+  color: white !important;
+}
+
+.flatpickr-day.disabled,
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+  color: var(--color-slate-600) !important;
+}
+
+.flatpickr-day.disabled:hover {
+  background: transparent !important;
+  cursor: not-allowed;
+}
+
+.flatpickr-prev-month,
+.flatpickr-next-month {
+  fill: white !important;
+  color: white !important;
+}
+
+.flatpickr-prev-month:hover svg,
+.flatpickr-next-month:hover svg {
+  fill: var(--color-purple-400) !important;
+}
+
+/* Flatpickr input styling */
+input[data-flatpickr]+.flatpickr-input {
+  cursor: pointer;
+}
+
+/* Time picker styling */
 input[type="time"] {
   color-scheme: dark;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.7) sepia(1) saturate(5) hue-rotate(200deg);
   cursor: pointer;
@@ -550,7 +643,6 @@ input[type="time"]::-webkit-calendar-picker-indicator {
   transition: all 0.2s;
 }
 
-input[type="date"]::-webkit-calendar-picker-indicator:hover,
 input[type="time"]::-webkit-calendar-picker-indicator:hover {
   opacity: 1;
   filter: invert(0.8) sepia(1) saturate(5) hue-rotate(260deg);
@@ -1439,4 +1531,80 @@ input[type="range"]::-webkit-slider-thumb {
 .remove-dest-btn:hover {
   color: var(--color-rose-400);
   background: rgba(239, 68, 68, 0.1);
+}
+
+/* ========================================
+   Autocomplete Dropdown
+   ======================================== */
+
+.autocomplete-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.autocomplete-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 0.75rem;
+  margin-top: 0.25rem;
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), 0 0 20px rgba(139, 92, 246, 0.15);
+  max-height: 240px;
+  overflow-y: auto;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.2s ease;
+}
+
+.autocomplete-dropdown.visible {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.autocomplete-item {
+  padding: 0.875rem 1rem;
+  cursor: pointer;
+  color: var(--color-slate-300);
+  font-size: 0.9375rem;
+  transition: all 0.15s ease;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.3);
+}
+
+.autocomplete-item:last-child {
+  border-bottom: none;
+}
+
+.autocomplete-item:hover,
+.autocomplete-item.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.15));
+  color: white;
+}
+
+.autocomplete-item.active {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.3), rgba(59, 130, 246, 0.2));
+}
+
+/* Autocomplete scrollbar */
+.autocomplete-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
+}
+
+.autocomplete-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.5);
 }

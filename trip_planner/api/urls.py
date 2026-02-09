@@ -6,6 +6,7 @@ from .views import (
     ItineraryCreateView, ItineraryGenerateView, ItineraryDetailView, ItineraryICSView,
     ImageAnalysisView, EditBlockView
 )
+from .views.places import PlacesAutocompleteView
 
 urlpatterns = [
     # Itineraries
@@ -19,4 +20,7 @@ urlpatterns = [
     
     # Edit
     path("edit/block", EditBlockView.as_view(), name="edit-block"),
+    
+    # Places
+    path("places/autocomplete", PlacesAutocompleteView.as_view(), name="places-autocomplete"),
 ]

@@ -26,24 +26,190 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeForm();
     initializeToggleButtons();
     initializeRangeSlider();
+    initializeAutocomplete();
     attachEventListeners();
 });
 
+// Autocomplete state
+let activeAutocomplete = null;
+let autocompleteTimeout = null;
+
+// Initialize autocomplete for location inputs
+function initializeAutocomplete() {
+    // Apply to origin input
+    const originInput = document.getElementById('origin');
+    if (originInput) {
+        setupAutocomplete(originInput);
+    }
+
+    // Apply to destination inputs (initial and dynamically added)
+    document.querySelectorAll('.destination-input').forEach(input => {
+        setupAutocomplete(input);
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.autocomplete-wrapper')) {
+            closeAllAutocomplete();
+        }
+    });
+}
+
+// Setup autocomplete for a single input
+function setupAutocomplete(input) {
+    // Wrap input if not already wrapped
+    if (!input.parentElement.classList.contains('autocomplete-wrapper')) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'autocomplete-wrapper';
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+
+        // Create dropdown
+        const dropdown = document.createElement('div');
+        dropdown.className = 'autocomplete-dropdown';
+        wrapper.appendChild(dropdown);
+    }
+
+    const dropdown = input.parentElement.querySelector('.autocomplete-dropdown');
+
+    // Input event for typing
+    input.addEventListener('input', (e) => {
+        const query = e.target.value.trim();
+
+        // Clear previous timeout
+        if (autocompleteTimeout) {
+            clearTimeout(autocompleteTimeout);
+        }
+
+        if (query.length < 2) {
+            dropdown.classList.remove('visible');
+            return;
+        }
+
+        // Debounce API calls
+        autocompleteTimeout = setTimeout(() => {
+            fetchAutocomplete(query, dropdown, input);
+        }, 300);
+    });
+
+    // Keyboard navigation
+    input.addEventListener('keydown', (e) => {
+        const items = dropdown.querySelectorAll('.autocomplete-item');
+        const active = dropdown.querySelector('.autocomplete-item.active');
+        let index = Array.from(items).indexOf(active);
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            index = Math.min(index + 1, items.length - 1);
+            items.forEach((item, i) => item.classList.toggle('active', i === index));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            index = Math.max(index - 1, 0);
+            items.forEach((item, i) => item.classList.toggle('active', i === index));
+        } else if (e.key === 'Enter' && active) {
+            e.preventDefault();
+            input.value = active.textContent;
+            dropdown.classList.remove('visible');
+        } else if (e.key === 'Escape') {
+            dropdown.classList.remove('visible');
+        }
+    });
+
+    // Focus event
+    input.addEventListener('focus', () => {
+        if (input.value.length >= 2 && dropdown.children.length > 0) {
+            dropdown.classList.add('visible');
+        }
+    });
+}
+
+// Fetch autocomplete suggestions
+async function fetchAutocomplete(query, dropdown, input) {
+    try {
+        const response = await fetch(`${API_BASE}/places/autocomplete?q=${encodeURIComponent(query)}`);
+        const data = await response.json();
+
+        if (data.predictions && data.predictions.length > 0) {
+            dropdown.innerHTML = data.predictions.map((p, i) => `
+                <div class="autocomplete-item${i === 0 ? ' active' : ''}" data-place-id="${p.place_id}">
+                    ${p.description}
+                </div>
+            `).join('');
+
+            // Add click handlers
+            dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    input.value = item.textContent.trim();
+                    dropdown.classList.remove('visible');
+                    input.focus();
+                });
+            });
+
+            dropdown.classList.add('visible');
+        } else {
+            dropdown.classList.remove('visible');
+        }
+    } catch (error) {
+        console.error('Autocomplete error:', error);
+        dropdown.classList.remove('visible');
+    }
+}
+
+// Close all autocomplete dropdowns
+function closeAllAutocomplete() {
+    document.querySelectorAll('.autocomplete-dropdown').forEach(d => {
+        d.classList.remove('visible');
+    });
+}
+
 // Form initialization
 function initializeForm() {
-    // Set minimum dates
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('start_date').min = today;
-    document.getElementById('end_date').min = today;
-
-    // Set default dates (tomorrow to 5 days later)
+    const today = new Date();
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const endDate = new Date();
-    endDate.setDate(endDate.getDate() + 5);
+    const defaultEnd = new Date();
+    defaultEnd.setDate(defaultEnd.getDate() + 5);
 
-    document.getElementById('start_date').value = tomorrow.toISOString().split('T')[0];
-    document.getElementById('end_date').value = endDate.toISOString().split('T')[0];
+    // Initialize Flatpickr for start date
+    const startPicker = flatpickr('#start_date', {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'M j, Y',
+        minDate: 'today',
+        defaultDate: tomorrow,
+        theme: 'dark',
+        disableMobile: true,
+        animate: true,
+        onChange: function (selectedDates, dateStr) {
+            // Update end date min to be >= start date
+            if (selectedDates[0]) {
+                endPicker.set('minDate', selectedDates[0]);
+                // If end date is before new start date, update it
+                const currentEnd = endPicker.selectedDates[0];
+                if (currentEnd && currentEnd < selectedDates[0]) {
+                    const newEnd = new Date(selectedDates[0]);
+                    newEnd.setDate(newEnd.getDate() + 1);
+                    endPicker.setDate(newEnd);
+                }
+            }
+        }
+    });
+
+    // Initialize Flatpickr for end date
+    const endPicker = flatpickr('#end_date', {
+        dateFormat: 'Y-m-d',
+        altInput: true,
+        altFormat: 'M j, Y',
+        minDate: tomorrow,
+        defaultDate: defaultEnd,
+        theme: 'dark',
+        disableMobile: true,
+        animate: true
+    });
+
+    // Store pickers for access
+    window.startPicker = startPicker;
+    window.endPicker = endPicker;
 }
 
 // Toggle buttons for interests, cuisines, dietary
