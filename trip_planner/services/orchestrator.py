@@ -77,16 +77,41 @@ def generate_itinerary(trip: dict, itinerary) -> dict:
                     planner_result.drafts, planner_result.issues)
     
     # 3. Weather
-    weather_result = weather.run(trip=trip)
-    _persist_result(itinerary, "weather", {"trip": trip}, weather_result.data,
-                    weather_result.drafts, weather_result.issues)
+    import time
+    time.sleep(2)  # Rate limit buffer
+    try:
+        weather_result = weather.run(trip=trip)
+        _persist_result(itinerary, "weather", {"trip": trip}, weather_result.data,
+                        weather_result.drafts, weather_result.issues)
+    except Exception as e:
+        logger.error(f"Weather agent failed: {e}")
+        # Create a dummy result to allow continuation
+        from trip_planner.models import AgentTrace  # Local import or use existing
+        # Mocking a result object - assuming namedtuple or class with .data/drafts/issues
+        class MockResult:
+            data = {"weather": {}, "adjustments": []}
+            drafts = []
+            issues = [str(e)]
+        weather_result = MockResult()
+        _store_trace(itinerary, "weather", "failed", {"trip": trip}, None, str(e))
     
     # 4. Attractions
-    attractions_result = attractions.run(trip=trip)
-    _persist_result(itinerary, "attractions", {"trip": trip}, attractions_result.data,
-                    attractions_result.drafts, attractions_result.issues)
+    time.sleep(2)  # Rate limit buffer
+    try:
+        attractions_result = attractions.run(trip=trip)
+        _persist_result(itinerary, "attractions", {"trip": trip}, attractions_result.data,
+                        attractions_result.drafts, attractions_result.issues)
+    except Exception as e:
+        logger.error(f"Attractions agent failed: {e}")
+        class MockResult:
+            data = {"attractions": []}
+            drafts = []
+            issues = [str(e)]
+        attractions_result = MockResult()
+        _store_trace(itinerary, "attractions", "failed", {"trip": trip}, None, str(e))
     
     # 5. Scheduler
+    time.sleep(2)  # Rate limit buffer
     weather_overview = weather_result.data.get("weather", {}).get("overview", "Weather unavailable")
     scheduler_result = scheduler.run(
         trip=trip, 
@@ -98,16 +123,28 @@ def generate_itinerary(trip: dict, itinerary) -> dict:
                     scheduler_result.drafts, scheduler_result.issues)
     
     # 6. Food
-    food_result = food.run(trip=trip, scheduler_output=scheduler_result.data)
-    _persist_result(itinerary, "food", {"trip": trip}, food_result.data,
-                    food_result.drafts, food_result.issues)
+    time.sleep(2)  # Rate limit buffer
+    try:
+        food_result = food.run(trip=trip, scheduler_output=scheduler_result.data)
+        _persist_result(itinerary, "food", {"trip": trip}, food_result.data,
+                        food_result.drafts, food_result.issues)
+    except Exception as e:
+        logger.error(f"Food agent failed: {e}")
+        class MockResult:
+            data = {"days": []}
+            drafts = []
+            issues = [str(e)]
+        food_result = MockResult()
+        _store_trace(itinerary, "food", "failed", {"trip": trip}, None, str(e))
     
     # 7. Budget
+    time.sleep(2)  # Rate limit buffer
     budget_result = budget.run(trip=trip, scheduler_output=scheduler_result.data, food_output=food_result.data)
     _persist_result(itinerary, "budget", {"trip": trip}, budget_result.data,
                     budget_result.drafts, budget_result.issues)
     
     # 8. Validator
+    time.sleep(1)  # Rate limit buffer
     validator_result = validator.run(trip=trip, scheduler_output=scheduler_result.data)
     _persist_result(itinerary, "validator", {"trip": trip}, validator_result.data,
                     validator_result.drafts, validator_result.issues)

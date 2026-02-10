@@ -62,8 +62,8 @@ class GeminiClient:
         return "429" in msg or "resource_exhausted" in msg or "quota" in msg
 
     @retry(
-        wait=wait_exponential(multiplier=2, min=4, max=30), 
-        stop=stop_after_attempt(4), 
+        wait=wait_exponential(multiplier=2, min=4, max=60), 
+        stop=stop_after_attempt(6), 
         reraise=True
     )
     def generate_content(self, prompt: str, schema: dict = None) -> str:
