@@ -6,6 +6,46 @@ Voyagent is an AI-powered trip planning application built with Django and Google
 
 ---
 
+## 📖 About the Project
+
+### Inspiration
+
+Travel planning is notoriously fragmented. We juggle hotel bookings, flight schedules, weather forecasts, and "Top 10" lists across a dozen browser tabs. The mental load of piecing it all together into a coherent itinerary is immense.
+
+I built **Voyagent** to solve this chaos. Inspired by the promise of agentic AI, I wanted to create a system where specialized agents work together—just like a human travel agency team—to handle the complexity for you.
+
+### How it was Built
+
+Voyagent leverages a **multi-agent architecture** powered by Google Gemini. Each aspect of the trip is handled by a dedicated AI agent:
+
+- **Research Agent**: Scours data for accommodation and transport.
+- **Attractions Agent**: Finds hidden gems and top-rated spots.
+- **Scheduler Agent**: The logic core that fits activities into time blocks.
+- **Orchestrator**: The conductor that ensures agents pass data correctly.
+
+The backend is **Django** for robust data management, while the frontend uses vanilla **JavaScript/CSS** for a fast, responsive experience.
+
+### Challenges & Solutions
+
+**1. Managing AI Hallucinations**
+Large Language Models can be unpredictable. To ensure reliability, we implemented a **Validator Agent** that double-checks the final itinerary for logical consistency.
+
+**2. Handling API Limits**
+We faced frequent `429 Resource Exhausted` errors from the Gemini API.
+*   **Solution**: We implemented an exponential backoff retry strategy and a robust "stub" system that provides fallback data, ensuring the app never crashes even when the AI is down.
+
+### Mathematical Logic
+
+A core challenge was scoring attractions ($S$) based on user interest ($I$), rating ($R$), and uniqueness ($U$):
+
+$$ S = w_1 \cdot I + w_2 \cdot \frac{R}{5} + w_3 \cdot U $$
+
+To ensure valid scheduling, we check:
+
+$$ T_{end}(A) + T_{travel}(A \to B) + T_{buffer} \le T_{start}(B) $$
+
+---
+
 ## ✨ Features
 
 - **🤖 8 AI Agents** — Planner, Research, Weather, Attractions, Scheduler, Food, Budget, Validator

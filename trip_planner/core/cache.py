@@ -83,9 +83,10 @@ class CacheClient:
         return cls.get(key, "weather")
     
     @classmethod
-    def set_weather(cls, destination: str, date_range: str, data: dict) -> bool:
+    def set_weather(cls, destination: str, date_range: str, data: dict, ttl: int = None) -> bool:
         key = cls._make_key("weather", destination, date_range)
-        return cls.set(key, data, settings.CACHE_TTL_WEATHER, "weather")
+        ttl = ttl or settings.CACHE_TTL_WEATHER
+        return cls.set(key, data, ttl, "weather")
     
     @classmethod
     def get_places(cls, destination: str, query: str) -> Optional[dict]:
@@ -93,9 +94,10 @@ class CacheClient:
         return cls.get(key, "places")
     
     @classmethod
-    def set_places(cls, destination: str, query: str, data: dict) -> bool:
+    def set_places(cls, destination: str, query: str, data: dict, ttl: int = None) -> bool:
         key = cls._make_key("places", destination, query)
-        return cls.set(key, data, settings.CACHE_TTL_PLACES, "places")
+        ttl = ttl or settings.CACHE_TTL_PLACES
+        return cls.set(key, data, ttl, "places")
     
     @classmethod
     def get_travel_time(cls, origin: str, dest: str) -> Optional[int]:
@@ -104,9 +106,10 @@ class CacheClient:
         return result.get("minutes") if result else None
     
     @classmethod
-    def set_travel_time(cls, origin: str, dest: str, minutes: int) -> bool:
+    def set_travel_time(cls, origin: str, dest: str, minutes: int, ttl: int = None) -> bool:
         key = cls._make_key("travel", origin, dest)
-        return cls.set(key, {"minutes": minutes}, settings.CACHE_TTL_TRAVEL, "travel")
+        ttl = ttl or settings.CACHE_TTL_TRAVEL
+        return cls.set(key, {"minutes": minutes}, ttl, "travel")
     
     @classmethod
     def get_currency_rate(cls, base: str, target: str) -> Optional[float]:

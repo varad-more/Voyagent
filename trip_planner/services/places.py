@@ -47,7 +47,7 @@ def get_attractions(destination: str, interests: list = None) -> dict:
     api_key = settings.GOOGLE_PLACES_API_KEY
     if not api_key:
         payload = _stub_attractions(destination)
-        cache_client.set_places(destination, interest_key, payload)
+        cache_client.set_places(destination, interest_key, payload, ttl=settings.CACHE_TTL_ERROR)
         return payload
     
     query = f"top attractions in {destination}"
@@ -65,15 +65,18 @@ def get_attractions(destination: str, interests: list = None) -> dict:
     except Exception as e:
         logger.error(f"Places API failed: {e}")
         payload = _stub_attractions(destination)
-        cache_client.set_places(destination, interest_key, payload)
+        cache_client.set_places(destination, interest_key, payload, ttl=settings.CACHE_TTL_ERROR)
         return payload
     
     attractions = []
     for item in data.get("results", [])[:12]:
         rating = item.get("rating", 3.5)
+        # Safe access to types
+        types_list = item.get("types") or ["attraction"]
+        
         attractions.append({
             "name": item.get("name"),
-            "reason": item.get("types", ["attraction"])[0].replace("_", " ").title(),
+            "reason": types_list[0].replace("_", " ").title(),
             "score": min(1.0, max(0.1, rating / 5)),
             "distance_km": 2.0,
             "categories": item.get("types", []),

@@ -41,7 +41,6 @@ class GeminiClient:
             self.client = genai.Client(api_key=api_key)
             self.model_name = settings.GEMINI_MODEL
             self._initialized = True
-            self._error_reason = None
             logger.info(f"Gemini initialized: {settings.GEMINI_MODEL}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
@@ -53,14 +52,23 @@ class GeminiClient:
     def is_available(self) -> bool:
         return self.client is not None
     
-    @retry(wait=wait_exponential(multiplier=1, min=2, max=8), stop=stop_after_attempt(3), reraise=True)
+    def _is_retryable_error(self, e: Exception) -> bool:
+        """Check if exception is a 429/quota error."""
+        msg = str(e).lower()
+        return "429" in msg or "resource_exhausted" in msg or "quota" in msg
+
+    @retry(
+        wait=wait_exponential(multiplier=2, min=4, max=30), 
+        stop=stop_after_attempt(4), 
+        reraise=True
+    )
     def generate_content(self, prompt: str, schema: dict = None) -> str:
         """Generate content with optional JSON schema guidance."""
         if not self.is_available:
-            reason = getattr(self, "_error_reason", "Gemini not available")
-            raise GeminiError(reason)
+            raise GeminiError(getattr(self, "_error_reason", "Gemini not available"))
         
         try:
+            # Common config
             config = types.GenerateContentConfig(
                 temperature=0.4,
                 response_mime_type="application/json",
@@ -76,10 +84,15 @@ class GeminiClient:
                 config=config,
             )
             return response.text or ""
+            
         except Exception as e:
-            # Try without schema if it fails
+            if self._is_retryable_error(e):
+                logger.warning(f"Gemini 429/Quota error, retrying... ({e})")
+                raise # tenacity will catch this
+            
+            # Non-retryable error, or schema failed
             if schema:
-                logger.warning(f"Schema-guided generation failed: {e}")
+                logger.warning(f"Schema-guided generation failed, retrying without schema: {e}")
                 try:
                     config = types.GenerateContentConfig(
                         temperature=0.4,
@@ -92,7 +105,11 @@ class GeminiClient:
                     )
                     return response.text or ""
                 except Exception as inner:
+                    # If this is also 429, we should technically retry, but simplified here
+                    if self._is_retryable_error(inner):
+                         raise # Propagate for retry
                     raise GeminiError(str(inner))
+            
             raise GeminiError(str(e))
     
     def generate_from_image(self, image_bytes: bytes, prompt: str) -> str:

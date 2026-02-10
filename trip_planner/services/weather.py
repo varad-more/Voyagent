@@ -44,7 +44,7 @@ def get_weather(destination: str, start_date: date, end_date: date) -> dict:
     api_key = settings.OPENWEATHER_API_KEY
     if not api_key:
         payload = _stub_weather(start_date, end_date)
-        cache_client.set_weather(destination, cache_key, payload)
+        cache_client.set_weather(destination, cache_key, payload, ttl=settings.CACHE_TTL_ERROR)
         return payload
     
     try:
@@ -59,7 +59,7 @@ def get_weather(destination: str, start_date: date, end_date: date) -> dict:
         
         if not geo_data:
             payload = _stub_weather(start_date, end_date)
-            cache_client.set_weather(destination, cache_key, payload)
+            cache_client.set_weather(destination, cache_key, payload, ttl=settings.CACHE_TTL_ERROR)
             return payload
         
         lat, lon = geo_data[0]["lat"], geo_data[0]["lon"]
@@ -76,7 +76,7 @@ def get_weather(destination: str, start_date: date, end_date: date) -> dict:
     except Exception as e:
         logger.error(f"Weather API failed: {e}")
         payload = _stub_weather(start_date, end_date)
-        cache_client.set_weather(destination, cache_key, payload)
+        cache_client.set_weather(destination, cache_key, payload, ttl=settings.CACHE_TTL_ERROR)
         return payload
     
     # Aggregate by day

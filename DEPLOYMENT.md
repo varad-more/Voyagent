@@ -1,201 +1,102 @@
-# Deployment Guide
+# Deployment Guide: Hosting for Free
 
-## ⚠️ Important Note About GitHub Pages
+This guide explains how to host the **Voyagent Trip Planner** on a completely free platform stack.
 
-**GitHub Pages is designed for STATIC websites only.** 
+## Recommended Free Stack
 
-This means it can host HTML, CSS, JavaScript, and images, but it **cannot** run Python, Django, or a database. 
+We recommend combining **Render.com** (for hosting the Python app) and **Neon.tech** (for the PostgreSQL database). Both offer generous free tiers that don't expire for hobby projects.
 
-Since **Trip Planner** is a dynamic AI-powered application requiring a Python backend (for Gemini AI, database, etc.), **you cannot deploy the full working application to GitHub Pages.**
-
-However, you *can* use GitHub Pages to host:
-1.  Project Documentation
-2.  A static landing page showcasing the project
-3.  A demo video or screenshots
+- **Web Hosting**: [Render](https://render.com) (Free Web Service)
+- **Database**: [Neon](https://neon.tech) (Free PostgreSQL, 0.5GB storage)
+- **AI/APIs**: Google Gemini (Free tier), OpenWeatherMap (Free tier)
 
 ---
 
-## Part 1: Deploying to Google Cloud Run (Recommended)
+## Step 1: Set up the Database (Neon)
 
-Cloud Run is a fully managed serverless platform that runs your containerized app. Your existing `Dockerfile` is already configured for Cloud Run.
+Since Render's free tier files are ephemeral (deleted on restart), you need an external database.
 
-### Prerequisites
-
-1.  **Google Cloud Account**: Sign up at [cloud.google.com](https://cloud.google.com) (free tier includes $300 credit)
-2.  **gcloud CLI**: Install from [cloud.google.com/sdk](https://cloud.google.com/sdk/docs/install)
-3.  **A GCP Project**: Create one in the [Cloud Console](https://console.cloud.google.com)
-
-### Step 1: Authenticate and Set Project
-
-```bash
-# Login to Google Cloud
-gcloud auth login
-
-# Set your project
-gcloud config set project YOUR_PROJECT_ID
-
-# Enable required APIs
-gcloud services enable run.googleapis.com
-gcloud services enable cloudbuild.googleapis.com
-```
-
-### Step 2: Deploy
-
-Deploy directly from source (Cloud Build will build the Docker image for you):
-
-```bash
-gcloud run deploy trip-planner \
-    --source . \
-    --region us-central1 \
-    --allow-unauthenticated \
-    --set-env-vars "DJANGO_DEBUG=False" \
-    --set-env-vars "DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(50))')" \
-    --set-env-vars "GEMINI_API_KEY=your-gemini-api-key" \
-    --set-env-vars "GEMINI_MODEL=gemini-2.0-flash" \
-    --set-env-vars "DJANGO_ALLOWED_HOSTS=*" \
-    --memory 512Mi \
-    --timeout 300
-```
-
-> **Note**: Replace `your-gemini-api-key` with your actual Gemini API key. You can add other optional API keys (Places, Weather, etc.) as additional `--set-env-vars` flags.
-
-### Step 3: Set the Service URL
-
-After deploy, Cloud Run will print the service URL (e.g., `https://trip-planner-xxxxx-uc.a.run.app`). Update the deployment with this URL:
-
-```bash
-# Get the service URL
-SERVICE_URL=$(gcloud run services describe trip-planner --region us-central1 --format 'value(status.url)')
-
-# Update with the service URL for CSRF/ALLOWED_HOSTS
-gcloud run services update trip-planner \
-    --region us-central1 \
-    --set-env-vars "CLOUD_RUN_SERVICE_URL=$SERVICE_URL"
-```
-
-### Step 4: Verify
-
-Open the service URL in your browser. You should see the Trip Planner homepage.
-
-```bash
-# Open in browser
-echo $SERVICE_URL
-```
-
-### Adding Optional API Keys
-
-You can update environment variables anytime without rebuilding:
-
-```bash
-gcloud run services update trip-planner \
-    --region us-central1 \
-    --set-env-vars "OPENWEATHER_API_KEY=your-key" \
-    --set-env-vars "GOOGLE_PLACES_API_KEY=your-key" \
-    --set-env-vars "DISTANCE_MATRIX_API_KEY=your-key" \
-    --set-env-vars "CURRENCY_API_KEY=your-key"
-```
-
-### Using Secrets (Recommended for Production)
-
-Instead of plain env vars, use Secret Manager for sensitive keys:
-
-```bash
-# Create a secret
-echo -n "your-gemini-api-key" | gcloud secrets create GEMINI_API_KEY --data-file=-
-
-# Grant Cloud Run access to the secret
-gcloud secrets add-iam-policy-binding GEMINI_API_KEY \
-    --member="serviceAccount:YOUR_PROJECT_NUMBER-compute@developer.gserviceaccount.com" \
-    --role="roles/secretmanager.secretAccessor"
-
-# Deploy with secret reference
-gcloud run deploy trip-planner \
-    --source . \
-    --region us-central1 \
-    --set-secrets "GEMINI_API_KEY=GEMINI_API_KEY:latest"
-```
-
-### Custom Domain (Optional)
-
-```bash
-# Map a custom domain
-gcloud run domain-mappings create \
-    --service trip-planner \
-    --domain your-domain.com \
-    --region us-central1
-```
-
-### Troubleshooting
-
-| Issue | Solution |
-|---|---|
-| **403 Forbidden** | Check `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` include your service URL |
-| **Static files not loading** | Ensure `whitenoise` is in `requirements.txt` and the middleware is configured |
-| **Timeout errors** | Increase `--timeout` (max 3600s) or `--memory` |
-| **Cold start slow** | Set `--min-instances 1` to keep one instance warm (costs more) |
-| **Data not persisting** | SQLite resets on deploy. Use Cloud SQL for persistent data |
-
-### Cost
-
-Cloud Run's free tier includes:
-- **2 million requests/month**
-- **360,000 GB-seconds of memory**
-- **180,000 vCPU-seconds**
-
-For a personal project, this is more than enough to stay within the free tier.
+1.  Sign up at [neon.tech](https://neon.tech).
+2.  Create a new **Project** (e.g., `trip-planner-db`).
+3.  Copy the **Connection String** (Postgres URL). It looks like `postgres://user:pass@ep-rest-123.aws.neon.tech/neondb?sslmode=require`.
+4.  Save this URL; you'll need it as your `DATABASE_URL`.
 
 ---
 
-## Part 2: Deploying to Render.com (Alternative)
+## Step 2: Deploy the App (Render)
 
-[Render](https://render.com) is a cloud platform that natively supports Python and Django. It has a free tier.
-
-### 1. Prepare for Deployment
-- Ensure `requirements.txt` includes `gunicorn`. (Already done)
-- Ensure your `settings.py` reads environment variables (API keys, Debug settings). (Already done)
-
-### 2. Connect to Render
-1.  Sign up at [render.com](https://render.com).
+1.  **Sign up** at [render.com](https://render.com).
 2.  Click **New +** and select **Web Service**.
-3.  Connect your GitHub repository.
-
-### 3. Configure Service
-- **Name:** trip-planner
-- **Runtime:** Python 3
-- **Build Command:** `pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate`
-- **Start Command:** `gunicorn trip_planner.wsgi:application`
-
-### 4. Environment Variables
-Add the following in the "Environment" tab on Render:
-- `PYTHON_VERSION`: `3.11.0`
-- `DJANGO_SECRET_KEY`: (Generate a strong random string)
-- `DJANGO_DEBUG`: `False`
-- `GEMINI_API_KEY`: (Your Gemini API Key)
-- `GEMINI_MODEL`: `gemini-2.0-flash`
-
-*Note: SQLite data on Render's free tier is **ephemeral** (resets on every deploy/restart). For persistent data, create a PostgreSQL service on Render.*
+3.  Connect your **GitHub repository**.
+4.  Configure the service:
+    - **Name**: `trip-planner` (or unique name)
+    - **Region**: Choose closest to you (e.g., Ohio, Frankfurt).
+    - **Branch**: `main`
+    - **Runtime**: `Python 3`
+    - **Build Command**: 
+      ```bash
+      pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate
+      ```
+    - **Start Command**: 
+      ```bash
+      gunicorn trip_planner.wsgi:application
+      ```
+    - **Instance Type**: Select **Free**.
 
 ---
 
-## Part 3: Deploying Static Landing Page to GitHub Pages
+## Step 3: Configure Environment Variables
 
-We have set up a GitHub Actions workflow that automatically deploys the content of the `docs/` folder to GitHub Pages.
+Scroll down to the **Environment Variables** section on Render and add the following keys. 
 
-### Steps:
-1.  Ensure you have a `docs/` folder with your static landing page.
-2.  Go to your GitHub Repository **Settings**.
-3.  Navigate to **Pages** (in the sidebar).
-4.  Under **Build and deployment**, select **GitHub Actions** as the source.
-5.  Push your changes to the `main` branch.
+| Key | Value | Description |
+|---|---|---|
+| `PYTHON_VERSION` | `3.11.0` | Ensures correct Python version |
+| `DATABASE_URL` | `postgres://...` | The connection string from Neon (Step 1) |
+| `DJANGO_SECRET_KEY` | *(Generate a random string)* | E.g. locally run: `python -c 'import secrets; print(secrets.token_urlsafe(50))'` |
+| `DJANGO_DEBUG` | `False` | Important for security |
+| `GEMINI_API_KEY` | `...` | Your Google Gemini API Key |
+| `GEMINI_MODEL` | `gemini-2.0-flash` | Or your preferred model |
+| `OPENWEATHER_API_KEY` | `...` | (Optional) For weather forecasts |
+| `GOOGLE_PLACES_API_KEY` | `...` | (Optional) For real place data |
+| `CACHE_TTL_ERROR` | `60` | Short cache for errors |
+
+**Note**: For `DJANGO_ALLOWED_HOSTS`, Render automatically sets the hostname, so you typically don't need to set this manually if `settings.py` is configured correctly (it reads `RENDER_EXTERNAL_HOSTNAME` if available, or just set it to `*` for simplicity if debugging). 
+
+*Tip: If you see "DisallowedHost" errors, add `DJANGO_ALLOWED_HOSTS` = `trip-planner.onrender.com` (your app URL).*
 
 ---
 
-## Part 4: Running with Docker (Locally)
+## Step 4: Finalize and Deploy
 
-If you have Docker installed, you can run the app without installing Python dependencies on your machine.
+1.  Click **Create Web Service**.
+2.  Render will start building your app. This takes a few minutes.
+3.  Watch the logs. You should see:
+    - Dependencies installing...
+    - Static files collected...
+    - Database migrations applying...
+    - `[gunicorn] Listening at: http://0.0.0.0:10000`
+4.  Once deployed, clicking the URL at the top will open your live app!
 
-```bash
-# Build and run
-docker-compose up --build
-```
-The app will be available at `http://localhost:8000`.
+---
+
+## Alternative: Google Cloud Run (Free Tier)
+
+Google Cloud Run has a very generous free tier (2 million requests/mo), but requires a credit card for account setup.
+
+1.  **Install gcloud CLI** and login.
+2.  **Deploy**:
+    ```bash
+    gcloud run deploy trip-planner --source . --allow-unauthenticated --region us-central1
+    ```
+3.  **Set Environment Variables** via the Cloud Console or CLI.
+4.  **Database**: You still need a persistent DB (Cloud SQL is expensive, so use **Neon** here too!).
+
+---
+
+## Troubleshooting
+
+- **Build Fails?** Check logs. Ensure `requirements.txt` is in the root.
+- **Application Error?** Check if `DATABASE_URL` is correct. The app crashes if it can't connect to the DB.
+- **Static Files Missing?** Ensure the build command includes `collectstatic`.
+- **429 Errors (Gemini)?** We implemented retry logic, but the free API has limits. Wait a minute and try again.

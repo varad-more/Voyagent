@@ -158,6 +158,7 @@ CACHE_TTL_WEATHER = int(os.environ.get("CACHE_TTL_WEATHER", "3600"))      # 1 ho
 CACHE_TTL_PLACES = int(os.environ.get("CACHE_TTL_PLACES", "86400"))       # 24 hours
 CACHE_TTL_TRAVEL = int(os.environ.get("CACHE_TTL_TRAVEL", "3600"))        # 1 hour
 CACHE_TTL_CURRENCY = int(os.environ.get("CACHE_TTL_CURRENCY", "43200"))   # 12 hours
+CACHE_TTL_ERROR = int(os.environ.get("CACHE_TTL_ERROR", "60"))            # 1 minute (for failures)
 
 # Planner
 PLANNER_BUFFER_MINUTES = int(os.environ.get("PLANNER_BUFFER_MINUTES", "20"))
