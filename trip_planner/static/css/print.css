@@ -1,0 +1,259 @@
+/* ========================================
+   Print / PDF Export Stylesheet
+   ======================================== */
+
+@media print {
+  /* Reset backgrounds for print */
+  body {
+    background: white !important;
+    color: #1a1a2e !important;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+
+  body::before {
+    display: none !important;
+  }
+
+  /* Hide non-printable elements */
+  .floating-icons,
+  .hero,
+  .btn-submit,
+  .btn-reset,
+  .btn-calendar,
+  .btn-share,
+  .btn-pdf,
+  .btn-share-link,
+  .btn-add-block,
+  .block-edit-btn,
+  .block-delete-btn,
+  .block-swap-btn,
+  .block-editor-overlay,
+  .demo-link,
+  .test-buttons-container,
+  .share-actions,
+  .error-section,
+  .loading-section,
+  #form-section,
+  #loading-section,
+  #error-section,
+  .action-buttons,
+  .swap-alternatives-overlay,
+  .footer {
+    display: none !important;
+  }
+
+  /* Show result section */
+  #result-section,
+  #share-itinerary-content {
+    display: block !important;
+  }
+
+  /* Remove glassmorphism for print */
+  .glass-card,
+  .sidebar-widget {
+    background: white !important;
+    backdrop-filter: none !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .glass-card::before {
+    display: none !important;
+  }
+
+  /* Itinerary header */
+  .itinerary-header h2,
+  .share-banner h2 {
+    color: #1a1a2e !important;
+    font-size: 18pt;
+  }
+
+  .destination-gradient {
+    background: none !important;
+    -webkit-text-fill-color: #7c3aed !important;
+    color: #7c3aed !important;
+  }
+
+  .itinerary-header .meta {
+    color: #64748b !important;
+  }
+
+  /* Layout: stack columns for print */
+  .itinerary-layout {
+    display: block !important;
+  }
+
+  .schedule-column,
+  .sidebar-column {
+    width: 100% !important;
+  }
+
+  /* Day cards */
+  .day-card {
+    page-break-inside: avoid;
+    margin-bottom: 1rem;
+    padding: 1rem;
+  }
+
+  .day-header {
+    border-bottom: 2px solid #7c3aed;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .day-badge {
+    background: #7c3aed !important;
+    color: white !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    padding: 0.25rem 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .day-date {
+    color: #64748b !important;
+  }
+
+  .weather-badge {
+    color: #64748b !important;
+  }
+
+  /* Schedule blocks */
+  .schedule-block {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    border-left: 3px solid #7c3aed !important;
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.5rem;
+    page-break-inside: avoid;
+  }
+
+  .schedule-block.meal {
+    border-left-color: #f97316 !important;
+  }
+
+  .schedule-block.travel {
+    border-left-color: #3b82f6 !important;
+    border-style: solid !important;
+  }
+
+  .block-time {
+    color: #64748b !important;
+    background: #f1f5f9 !important;
+    font-size: 0.7rem;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .block-title {
+    color: #1e293b !important;
+    font-size: 0.95rem;
+  }
+
+  .block-description {
+    color: #475569 !important;
+    font-size: 0.85rem;
+  }
+
+  .micro-tag {
+    color: #7c3aed !important;
+    background: #ede9fe !important;
+    border-color: #c4b5fd !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    font-size: 0.7rem;
+  }
+
+  /* Budget widget */
+  .sidebar-widget {
+    page-break-inside: avoid;
+    margin-top: 1rem;
+  }
+
+  .sidebar-widget h3 {
+    color: #1e293b !important;
+  }
+
+  .budget-item .label {
+    color: #475569 !important;
+  }
+
+  .budget-item .value {
+    color: #059669 !important;
+  }
+
+  .budget-total .value {
+    background: none !important;
+    -webkit-text-fill-color: #059669 !important;
+    color: #059669 !important;
+    font-size: 1.25rem;
+  }
+
+  /* Transport widget */
+  .transport-option {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .transport-option .mode {
+    color: #1e293b !important;
+  }
+
+  .recommended-badge {
+    background: #059669 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Share page specifics */
+  .share-banner {
+    background: white !important;
+    border: none !important;
+    padding: 0 !important;
+    margin-bottom: 1rem;
+  }
+
+  .share-block {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    page-break-inside: avoid;
+  }
+
+  .share-block-time {
+    color: #64748b !important;
+  }
+
+  .share-block-title {
+    color: #1e293b !important;
+  }
+
+  .share-block-desc {
+    color: #475569 !important;
+  }
+
+  .share-budget-summary {
+    background: #f8fafc !important;
+    border: 1px solid #e2e8f0 !important;
+    page-break-inside: avoid;
+  }
+
+  /* Page margins */
+  @page {
+    margin: 1.5cm;
+    size: A4;
+  }
+
+  /* Links */
+  a {
+    color: #7c3aed !important;
+    text-decoration: underline;
+  }
+
+  .block-link::after {
+    content: " (" attr(href) ")";
+    font-size: 0.7rem;
+  }
+}

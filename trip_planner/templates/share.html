@@ -1,0 +1,189 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Shared itinerary from Voyagent — AI-Powered Trip Planning">
+    <title>{{ request_json.destination|default:"Trip" }} — Voyagent Itinerary</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="{% static 'css/print.css' %}" media="print">
+    <style>
+        /* Share-page specific overrides */
+        .share-banner {
+            text-align: center;
+            padding: 1.5rem;
+            background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(59, 130, 246, 0.15));
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+        }
+        .share-banner h2 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        .share-banner .destination-gradient {
+            background: linear-gradient(to right, var(--color-cyan-400), var(--color-purple-400), var(--color-pink-400));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .share-banner p {
+            color: var(--color-slate-400);
+            font-size: 0.875rem;
+        }
+        .share-actions {
+            display: flex;
+            gap: 0.75rem;
+            justify-content: center;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .share-actions button {
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .btn-print-pdf {
+            background: linear-gradient(135deg, var(--color-purple-500), var(--color-blue-500));
+            color: white;
+        }
+        .btn-print-pdf:hover { transform: translateY(-1px); box-shadow: 0 4px 15px rgba(139,92,246,0.3); }
+        .btn-plan-own {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--color-slate-700) !important;
+            color: var(--color-slate-300);
+        }
+        .btn-plan-own:hover { background: var(--color-slate-700); }
+
+        .share-day-card {
+            margin-bottom: 1.5rem;
+        }
+        .share-day-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .share-block {
+            padding: 0.75rem 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            background: rgba(30, 41, 59, 0.5);
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .share-block-time {
+            font-size: 0.75rem;
+            color: var(--color-slate-400);
+            font-weight: 600;
+        }
+        .share-block-title {
+            font-weight: 600;
+            color: white;
+        }
+        .share-block-desc {
+            font-size: 0.875rem;
+            color: var(--color-slate-300);
+        }
+        .share-budget-summary {
+            margin-top: 1.5rem;
+            padding: 1rem;
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(51,65,85,0.5);
+            border-radius: 0.75rem;
+        }
+    </style>
+</head>
+<body>
+    <main class="main-content">
+        <div class="share-banner animate-fadeIn">
+            <h2>Your Trip to <span class="destination-gradient">{{ request_json.destination|default:"Unknown" }}</span></h2>
+            <p>Shared itinerary from Voyagent — AI-Powered Trip Planning</p>
+            <div class="share-actions">
+                <button class="btn-print-pdf" onclick="window.print()">Download PDF</button>
+                <a href="/" style="text-decoration:none;"><button class="btn-plan-own">Plan Your Own Trip</button></a>
+            </div>
+        </div>
+
+        {% if result_json.days %}
+        <div id="share-itinerary-content">
+            {% for day in result_json.days %}
+            <div class="glass-card share-day-card">
+                <h3>
+                    <span class="day-badge" style="background:linear-gradient(135deg,var(--color-purple-500),var(--color-pink-400));padding:0.4rem 0.75rem;border-radius:9999px;font-size:0.8rem;">Day {{ forloop.counter }}</span>
+                    {{ day.date }}
+                    {% if day.weather_summary %}
+                    <span style="font-size:0.8rem;color:var(--color-slate-400);margin-left:auto;">{{ day.weather_summary }}</span>
+                    {% endif %}
+                </h3>
+                {% for block in day.schedule %}
+                <div class="share-block">
+                    <div class="share-block-time">{{ block.start_time }} - {{ block.end_time }}</div>
+                    <div class="share-block-title">{{ block.title }}</div>
+                    {% if block.description %}
+                    <div class="share-block-desc">{{ block.description }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+                {% for meal in day.meals %}
+                <div class="share-block" style="border-left:3px solid #fb923c;">
+                    <div class="share-block-time">{{ meal.time }}</div>
+                    <div class="share-block-title">{{ meal.name }}</div>
+                    {% if meal.cuisine %}
+                    <div class="share-block-desc">{{ meal.cuisine }}</div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endfor %}
+
+            {% if result_json.budget %}
+            <div class="share-budget-summary">
+                <h3 style="color:white;font-size:1.125rem;margin-bottom:0.75rem;">Budget Summary</h3>
+                {% for key, val in result_json.budget.items %}
+                <div style="display:flex;justify-content:space-between;padding:0.4rem 0;color:var(--color-slate-300);">
+                    <span>{{ key|title }}</span>
+                    <span style="color:var(--color-emerald-400);font-weight:600;">{{ val }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if result_json.packing_list %}
+            <div class="share-budget-summary" style="margin-top:1rem;">
+                <h3 style="color:white;font-size:1.125rem;margin-bottom:0.75rem;">Packing List</h3>
+                <div style="display:flex;flex-wrap:wrap;gap:0.5rem;">
+                    {% for item in result_json.packing_list %}
+                    <span style="padding:0.25rem 0.75rem;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:9999px;font-size:0.8rem;color:var(--color-purple-400);">{{ item }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <div class="glass-card" style="text-align:center;padding:3rem;">
+            <p style="color:var(--color-slate-400);">This itinerary is still being generated or has no results yet.</p>
+        </div>
+        {% endif %}
+
+        <footer class="footer">
+            <div class="powered-by">
+                <span>Powered by</span>
+                <span class="gemini">Gemini AI</span>
+                <span>-</span>
+                <span>Voyagent</span>
+            </div>
+        </footer>
+    </main>
+</body>
+</html>

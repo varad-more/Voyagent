@@ -1689,6 +1689,28 @@ input[type="range"]::-webkit-slider-thumb {
   font-weight: 700;
 }
 
+/* Swap block button */
+.block-swap-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  opacity: 0;
+  transition: all 0.2s ease;
+  color: var(--color-cyan-400);
+}
+
+.schedule-block:hover .block-swap-btn {
+  opacity: 1;
+}
+
+.block-swap-btn:hover {
+  background: rgba(6, 182, 212, 0.2);
+  transform: scale(1.1);
+}
+
 /* Delete block button */
 .block-delete-btn {
   background: none;
@@ -1711,6 +1733,200 @@ input[type="range"]::-webkit-slider-thumb {
   background: rgba(239, 68, 68, 0.15);
   transform: scale(1.1);
   color: #fca5a5;
+}
+
+/* ========================================
+   PDF & Share Link Buttons
+   ======================================== */
+
+.btn-pdf {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(244, 114, 182, 0.4);
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.15), rgba(147, 51, 234, 0.15));
+  color: var(--color-pink-400);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-pdf:hover {
+  background: linear-gradient(135deg, rgba(244, 114, 182, 0.25), rgba(147, 51, 234, 0.25));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(244, 114, 182, 0.2);
+}
+
+.btn-share-link {
+  width: 100%;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.15), rgba(139, 92, 246, 0.15));
+  color: var(--color-blue-400);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  transition: all 0.2s ease;
+}
+
+.btn-share-link:hover {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.25), rgba(139, 92, 246, 0.25));
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(59, 130, 246, 0.2);
+}
+
+/* ========================================
+   Day Footer Actions
+   ======================================== */
+
+.day-footer-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.day-footer-actions .btn-add-block {
+  flex: 1;
+  margin-top: 0;
+}
+
+.btn-regenerate-day {
+  flex: 0 0 auto;
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px dashed rgba(6, 182, 212, 0.3);
+  background: transparent;
+  color: var(--color-slate-500);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  transition: all 0.25s ease;
+}
+
+.btn-regenerate-day:hover {
+  border-color: var(--color-cyan-400);
+  color: var(--color-cyan-400);
+  background: rgba(6, 182, 212, 0.05);
+}
+
+.btn-regenerate-day:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ========================================
+   Swap Alternatives Modal
+   ======================================== */
+
+.swap-alternatives-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease;
+  padding: 1rem;
+}
+
+.swap-alternatives-modal {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.95));
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  border-radius: 1.25rem;
+  padding: 2rem;
+  width: 100%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.5), 0 0 30px rgba(6, 182, 212, 0.15);
+}
+
+.swap-alternatives-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.swap-alternative-card {
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: rgba(30, 41, 59, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.swap-alternative-card:hover {
+  border-color: var(--color-cyan-400);
+  background: rgba(6, 182, 212, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(6, 182, 212, 0.15);
+}
+
+.swap-alt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.swap-alt-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  color: var(--color-purple-400);
+}
+
+.swap-alt-time {
+  font-size: 0.75rem;
+  color: var(--color-slate-500);
+}
+
+.swap-alt-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 0.25rem;
+}
+
+.swap-alt-desc {
+  font-size: 0.875rem;
+  color: var(--color-slate-300);
+  margin-bottom: 0.5rem;
+  line-height: 1.4;
+}
+
+.swap-alt-location {
+  font-size: 0.8rem;
+  color: var(--color-slate-400);
+}
+
+.swap-alt-why {
+  font-size: 0.8rem;
+  color: var(--color-emerald-400);
+  font-style: italic;
+  margin-top: 0.375rem;
+  padding-top: 0.375rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* ========================================
@@ -1773,6 +1989,139 @@ input[type="range"]::-webkit-slider-thumb {
     box-shadow: 0 0 20px rgba(139, 92, 246, 0.6);
     transform: scale(1.1);
   }
+}
+
+/* ========================================
+   Trip Style Presets
+   ======================================== */
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+@media (max-width: 640px) {
+  .presets-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.preset-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 1rem 0.75rem;
+  border-radius: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(15, 23, 42, 0.4);
+  cursor: pointer;
+  transition: all 0.25s ease;
+  text-align: center;
+}
+
+.preset-card:hover {
+  border-color: rgba(139, 92, 246, 0.4);
+  background: rgba(139, 92, 246, 0.08);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(139, 92, 246, 0.15);
+}
+
+.preset-card.selected {
+  border-color: var(--color-purple-400);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.15));
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.25);
+}
+
+.preset-icon {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.preset-label {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: white;
+}
+
+.preset-desc {
+  font-size: 0.7rem;
+  color: var(--color-slate-400);
+  line-height: 1.3;
+}
+
+/* ========================================
+   Booking Links Widget
+   ======================================== */
+
+.booking-links-widget {
+  /* inherits from .sidebar-widget */
+}
+
+.booking-links-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.booking-link-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgba(30, 41, 59, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.2s ease;
+}
+
+.booking-link-item:hover {
+  border-color: rgba(139, 92, 246, 0.3);
+  background: rgba(139, 92, 246, 0.08);
+  transform: translateX(3px);
+}
+
+.booking-link-icon {
+  font-size: 1.25rem;
+  flex-shrink: 0;
+}
+
+.booking-link-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.booking-link-provider {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-purple-400);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.booking-link-label {
+  font-size: 0.8125rem;
+  color: var(--color-slate-300);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.booking-link-arrow {
+  color: var(--color-slate-500);
+  font-size: 1rem;
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.booking-link-item:hover .booking-link-arrow {
+  transform: translateX(3px);
+  color: var(--color-purple-400);
 }
 
 /* ========================================

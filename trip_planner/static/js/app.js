@@ -327,49 +327,86 @@ function buildPayload() {
     };
 }
 
-// Form submission handler
+// Form submission handler — uses SSE streaming for real-time progress
 async function handleFormSubmit(e) {
     e.preventDefault();
 
     const payload = buildPayload();
 
     showLoading();
-    startAgentPipeline();
+    resetPipelineUI();
 
     try {
-        const response = await fetch(`${API_BASE}/itineraries/generate`, {
+        const response = await fetch(`${API_BASE}/itineraries/stream`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(payload)
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-
-            // Handle specific Gemini configuration error
-            if (response.status === 503 || errorData.code === 'gemini_not_configured' || (errorData.message && errorData.message.includes('API key'))) {
-                throw new Error("⚠️ Gemini API Key Missing.\n\nPlease check your server console and README.md for setup instructions.");
-            }
-
-            // Handle Quota Exhaustion (429)
-            if (response.status === 429 || errorData.code === 'gemini_quota_exhausted') {
-                throw new Error("🚫 AI Capacity Reached.\n\nThe Gemini AI service is currently overloaded (Quota Exhausted).\nPlease wait a few moments and try again.");
-            }
-
-            throw new Error(errorData.error || errorData.detail || 'Failed to generate itinerary');
+            // Try to parse error JSON, else use status text
+            let msg = 'Failed to generate itinerary';
+            try {
+                const errorData = await response.json();
+                if (response.status === 503 || errorData.code === 'gemini_not_configured' || (errorData.message && errorData.message.includes('API key'))) {
+                    msg = "Gemini API Key Missing.\n\nPlease check your server console and README.md for setup instructions.";
+                } else if (response.status === 429 || errorData.code === 'gemini_quota_exhausted') {
+                    msg = "AI Capacity Reached.\n\nThe Gemini AI service is currently overloaded.\nPlease wait a few moments and try again.";
+                } else {
+                    msg = errorData.error || errorData.detail || msg;
+                }
+            } catch (_) { /* ignore parse errors */ }
+            throw new Error(msg);
         }
 
-        const data = await response.json();
-        currentItinerary = data;
-        stopAgentPipeline();
-        showResult(data);
+        // Read the SSE stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
 
+        while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop(); // keep incomplete line in buffer
+
+            let eventType = 'message';
+            for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                    eventType = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                    const dataStr = line.slice(6);
+                    try {
+                        const data = JSON.parse(dataStr);
+                        handleSSEEvent(eventType, data);
+                    } catch (_) { /* skip non-JSON */ }
+                    eventType = 'message'; // reset after processing
+                }
+                // ignore comments (lines starting with ':')
+            }
+        }
     } catch (error) {
         console.error('Error:', error);
         stopAgentPipeline();
         showError(error.message);
+    }
+}
+
+// Handle a single SSE event
+function handleSSEEvent(eventType, data) {
+    if (eventType === 'progress' || data.type === 'progress') {
+        updatePipelineFromSSE(data.stage, data.status, data.detail || '');
+    } else if (eventType === 'result' || data.type === 'result') {
+        currentItinerary = data.data;
+        stopAgentPipeline();
+        showResult(data.data);
+    } else if (eventType === 'error' || data.type === 'error') {
+        stopAgentPipeline();
+        showError(data.message || 'Generation failed');
+    } else if (eventType === 'done') {
+        stopAgentPipeline();
     }
 }
 
@@ -513,6 +550,21 @@ const DEMO_ITINERARY = {
             activities: { amount: 300, currency: 'USD' },
             miscellaneous: { amount: 200, currency: 'USD' },
             total: { amount: 2200, currency: 'USD' }
+        },
+        booking_links: {
+            flights: [
+                { provider: 'Google Flights', url: 'https://www.google.com/travel/flights?q=flights+from+Phoenix+to+Tempe', label: 'Search flights Phoenix to Tempe' },
+                { provider: 'Skyscanner', url: 'https://www.skyscanner.com/transport/flights/phoenix/tempe/', label: 'Compare on Skyscanner' }
+            ],
+            hotels: [
+                { provider: 'Google Hotels', url: 'https://www.google.com/travel/hotels?q=hotels+in+Tempe', label: 'Hotels in Tempe' },
+                { provider: 'Booking.com', url: 'https://www.booking.com/searchresults.html?ss=Tempe%2C+AZ', label: 'Hotels on Booking.com' },
+                { provider: 'Google Hotels', url: 'https://www.google.com/travel/hotels?q=hotels+in+Las+Vegas', label: 'Hotels in Las Vegas' }
+            ],
+            trains: [],
+            transport: [
+                { provider: 'Rome2Rio', url: 'https://www.rome2rio.com/map/Phoenix/Tempe', label: 'All transport options to Tempe' }
+            ]
         }
     }
 };
@@ -687,6 +739,8 @@ function renderItinerary(data) {
     const transport = result.transport_analysis;
     const budget = result.budget_breakdown;
 
+    const bookingLinks = result.booking_links || null;
+
     let html = `
         <div class="itinerary-container animate-fadeIn">
             <div class="itinerary-header">
@@ -704,14 +758,21 @@ function renderItinerary(data) {
                         <button class="btn-calendar" onclick="downloadICS()">
                             📅 Add to Calendar
                         </button>
+                        <button class="btn-pdf" onclick="downloadPDF()">
+                            📄 Download PDF
+                        </button>
+                        <button class="btn-share-link" onclick="copyShareLink()">
+                            🔗 Share Link
+                        </button>
                         <button class="btn-share" onclick="shareItinerary()">
-                            📋 Copy & Share
+                            📋 Copy Text
                         </button>
                         <button class="btn-reset" onclick="resetPlanner()">
                             Start New Plan
                         </button>
                     </div>
                     
+                    ${bookingLinks ? renderBookingLinksWidget(bookingLinks) : ''}
                     ${transport ? renderTransportWidget(transport) : ''}
                     ${budget ? renderBudgetWidget(budget) : ''}
                 </div>
@@ -743,9 +804,14 @@ function renderDays(schedule) {
             <div class="schedule-blocks">
                 ${day.blocks.map((block, blockIndex) => renderBlock(block, dayIndex, blockIndex)).join('')}
             </div>
-            <button class="btn-add-block" onclick="openAddBlockForm(${dayIndex})">
-                <span>+</span> Add Activity
-            </button>
+            <div class="day-footer-actions">
+                <button class="btn-add-block" onclick="openAddBlockForm(${dayIndex})">
+                    <span>+</span> Add Activity
+                </button>
+                <button class="btn-regenerate-day" onclick="regenerateDay(${dayIndex})">
+                    🔄 Regenerate Day
+                </button>
+            </div>
         </div>
     `).join('');
 }
@@ -759,6 +825,9 @@ function renderBlock(block, dayIndex, blockIndex) {
         <div class="schedule-block ${typeClass}" data-day-index="${dayIndex}" data-block-index="${blockIndex}">
             <div class="block-header-row">
                 <span class="block-time">${formatTime(block.start_time)} - ${formatTime(block.end_time)}</span>
+                <button class="block-swap-btn" onclick="swapBlock(${dayIndex}, ${blockIndex})" title="Swap for alternatives">
+                    🔄
+                </button>
                 <button class="block-edit-btn" onclick="openBlockEditor(${dayIndex}, ${blockIndex})" title="Edit this block">
                     ✏️
                 </button>
@@ -1005,6 +1074,39 @@ function renderBudgetWidget(budget) {
     `;
 }
 
+// Render booking links widget
+function renderBookingLinksWidget(links) {
+    const sections = [
+        { key: 'flights', icon: '✈️', title: 'Flights' },
+        { key: 'hotels', icon: '🏨', title: 'Hotels' },
+        { key: 'trains', icon: '🚆', title: 'Trains' },
+        { key: 'transport', icon: '🗺️', title: 'Transport' },
+    ];
+
+    let linksHtml = '';
+    sections.forEach(function(sec) {
+        const items = links[sec.key];
+        if (!items || items.length === 0) return;
+        items.forEach(function(item) {
+            linksHtml += '<a href="' + item.url + '" target="_blank" rel="noopener" class="booking-link-item">'
+                + '<span class="booking-link-icon">' + sec.icon + '</span>'
+                + '<span class="booking-link-text">'
+                + '<span class="booking-link-provider">' + item.provider + '</span>'
+                + '<span class="booking-link-label">' + item.label + '</span>'
+                + '</span>'
+                + '<span class="booking-link-arrow">→</span>'
+                + '</a>';
+        });
+    });
+
+    if (!linksHtml) return '';
+
+    return '<div class="sidebar-widget booking-links-widget">'
+        + '<h3>🔗 Book Now</h3>'
+        + '<div class="booking-links-list">' + linksHtml + '</div>'
+        + '</div>';
+}
+
 // Reset planner
 function resetPlanner() {
     currentItinerary = null;
@@ -1014,6 +1116,149 @@ function resetPlanner() {
 
 // Make resetPlanner global
 window.resetPlanner = resetPlanner;
+
+// ========== Trip Style Presets ==========
+
+const TRIP_PRESETS = {
+    backpacker: {
+        label: '🎒 Backpacker',
+        description: 'Budget-friendly, hostels, street food, max adventure',
+        budget: { comfort_level: 'budget', total_budget: 1500 },
+        interests: ['nature', 'adventure', 'food', 'culture'],
+        cuisines: ['local', 'street_food'],
+        dietary: [],
+        pace: 'fast',
+        lodging_type: 'hostel',
+        max_distance: 10,
+        notes: 'Traveling on a budget! Prefer free/cheap activities, street food, and meeting other travelers.',
+    },
+    family: {
+        label: '👨‍👩‍👧‍👦 Family',
+        description: 'Kid-friendly, comfortable, safe neighborhoods',
+        budget: { comfort_level: 'midrange', total_budget: 5000 },
+        interests: ['culture', 'nature', 'food', 'relaxation'],
+        cuisines: ['local', 'western'],
+        dietary: [],
+        pace: 'slow',
+        lodging_type: 'apartment',
+        max_distance: 5,
+        notes: 'Traveling with kids. Need family-friendly activities, comfortable stays, and not too packed schedule.',
+    },
+    luxury: {
+        label: '💎 Luxury',
+        description: 'Premium hotels, fine dining, exclusive experiences',
+        budget: { comfort_level: 'luxury', total_budget: 10000 },
+        interests: ['culture', 'food', 'art', 'relaxation', 'shopping'],
+        cuisines: ['fine_dining', 'local'],
+        dietary: [],
+        pace: 'slow',
+        lodging_type: 'boutique',
+        max_distance: 3,
+        notes: 'Looking for premium experiences, Michelin-star dining, and exclusive access.',
+    },
+    adventure: {
+        label: '🧗 Adventure',
+        description: 'Outdoor thrills, hiking, extreme sports',
+        budget: { comfort_level: 'midrange', total_budget: 4000 },
+        interests: ['adventure', 'nature', 'food'],
+        cuisines: ['local', 'street_food'],
+        dietary: [],
+        pace: 'fast',
+        lodging_type: 'any',
+        max_distance: 15,
+        notes: 'Looking for adrenaline! Hiking, water sports, rock climbing, zip-lining.',
+    },
+    cultural: {
+        label: '🏛️ Cultural',
+        description: 'Museums, history, local traditions, art',
+        budget: { comfort_level: 'midrange', total_budget: 4000 },
+        interests: ['culture', 'history', 'art', 'food'],
+        cuisines: ['local', 'fine_dining'],
+        dietary: [],
+        pace: 'moderate',
+        lodging_type: 'hotel',
+        max_distance: 5,
+        notes: 'Love museums, historical sites, art galleries, and immersing in local culture.',
+    },
+    romantic: {
+        label: '💕 Romantic',
+        description: 'Couple getaway, scenic spots, intimate dining',
+        budget: { comfort_level: 'luxury', total_budget: 6000 },
+        interests: ['food', 'art', 'relaxation', 'culture', 'nightlife'],
+        cuisines: ['fine_dining', 'local'],
+        dietary: [],
+        pace: 'slow',
+        lodging_type: 'boutique',
+        max_distance: 3,
+        notes: 'Romantic getaway for two. Scenic restaurants, sunset views, cozy experiences.',
+    },
+};
+
+function applyPreset(presetKey) {
+    const preset = TRIP_PRESETS[presetKey];
+    if (!preset) return;
+
+    // Budget
+    document.getElementById('comfort_level').value = preset.budget.comfort_level;
+    document.getElementById('total_budget').value = preset.budget.total_budget;
+
+    // Interests
+    const interestsGroup = document.getElementById('interests-group');
+    interestsGroup.querySelectorAll('.toggle-btn').forEach(function(btn) {
+        if (preset.interests.includes(btn.dataset.value)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Cuisines
+    const cuisinesGroup = document.getElementById('cuisines-group');
+    cuisinesGroup.querySelectorAll('.toggle-btn').forEach(function(btn) {
+        if (preset.cuisines.includes(btn.dataset.value)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Dietary
+    const dietaryGroup = document.getElementById('dietary-group');
+    dietaryGroup.querySelectorAll('.toggle-btn').forEach(function(btn) {
+        if (preset.dietary.includes(btn.dataset.value)) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
+
+    // Pace
+    document.getElementById('pace').value = preset.pace;
+
+    // Lodging
+    document.getElementById('lodging_type').value = preset.lodging_type;
+    document.getElementById('max_distance').value = preset.max_distance;
+    document.getElementById('distance-value').textContent = preset.max_distance + ' km';
+
+    // Notes
+    document.getElementById('notes').value = preset.notes;
+
+    // Visual feedback on the preset card
+    document.querySelectorAll('.preset-card').forEach(function(card) {
+        card.classList.remove('selected');
+    });
+    var selected = document.querySelector('.preset-card[data-preset="' + presetKey + '"]');
+    if (selected) selected.classList.add('selected');
+
+    // Smooth scroll to the budget section (first changed field)
+    var budgetSection = document.getElementById('comfort_level');
+    if (budgetSection) {
+        budgetSection.closest('.glass-card').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+}
+
+// Make global
+window.applyPreset = applyPreset;
 
 // --- Multi-City Functions ---
 
@@ -1384,35 +1629,269 @@ function saveNewBlock(dayIndex) {
     showResult(currentItinerary);
 }
 
-// ========== Agent Pipeline Progress ==========
+// ========== PDF Download ==========
+
+function downloadPDF() {
+    window.print();
+}
+
+// Make global
+window.downloadPDF = downloadPDF;
+
+// ========== Share Link ==========
+
+function copyShareLink() {
+    if (!currentItinerary) return;
+    const itineraryId = currentItinerary.itinerary_id || currentItinerary.id;
+    if (!itineraryId || itineraryId === 'demo-az-123') {
+        // Fallback: copy text for demo
+        shareItinerary();
+        return;
+    }
+
+    const shareUrl = `${window.location.origin}/share/${itineraryId}/`;
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        const btn = document.querySelector('.btn-share-link');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '✅ Link Copied!';
+            btn.style.background = 'linear-gradient(135deg, var(--color-emerald-500), var(--color-cyan-400))';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.background = '';
+            }, 2000);
+        }
+    }).catch(() => {
+        prompt('Copy this share link:', shareUrl);
+    });
+}
+
+// Make global
+window.copyShareLink = copyShareLink;
+
+// ========== Swap Block (Get Alternatives) ==========
+
+async function swapBlock(dayIndex, blockIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const block = result.daily_schedule[dayIndex].blocks[blockIndex];
+    const destination = result.destination || 'Unknown';
+
+    // Show loading overlay
+    const overlayHtml = `
+        <div class="swap-alternatives-overlay" id="swap-overlay" onclick="if(event.target===this) closeSwapOverlay()">
+            <div class="swap-alternatives-modal">
+                <div class="editor-header">
+                    <h3>🔄 Finding Alternatives...</h3>
+                    <button class="editor-close-btn" onclick="closeSwapOverlay()">×</button>
+                </div>
+                <div class="swap-loading">
+                    <div class="loading-spinner" style="width:3rem;height:3rem;margin:2rem auto;">
+                        <div class="ring outer"></div>
+                        <div class="ring inner"></div>
+                        <div class="ring reverse"></div>
+                        <span class="center-icon">🔄</span>
+                    </div>
+                    <p style="text-align:center;color:var(--color-slate-400);">Our AI is finding 3 alternatives for "<strong>${block.title}</strong>"</p>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', overlayHtml);
+
+    try {
+        const response = await fetch(`${API_BASE}/edit/swap`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                current_block: {
+                    start_time: block.start_time,
+                    end_time: block.end_time,
+                    title: block.title,
+                    location: block.location || '',
+                    description: block.description || '',
+                    block_type: block.block_type || 'activity',
+                },
+                destination: destination,
+                block_type: block.block_type || 'activity',
+                day_date: result.daily_schedule[dayIndex].date || '',
+                preferences: '',
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Swap failed');
+        }
+
+        const data = await response.json();
+        showSwapAlternatives(dayIndex, blockIndex, block, data.alternatives || []);
+
+    } catch (error) {
+        console.error('Swap error:', error);
+        closeSwapOverlay();
+        alert(`Swap failed: ${error.message}`);
+    }
+}
+
+function showSwapAlternatives(dayIndex, blockIndex, originalBlock, alternatives) {
+    const overlay = document.getElementById('swap-overlay');
+    if (!overlay) return;
+
+    const modal = overlay.querySelector('.swap-alternatives-modal');
+
+    let cardsHtml = '';
+    alternatives.forEach((alt, i) => {
+        const badgeLabel = i === 0 ? '⭐ Popular' : i === 1 ? '💎 Hidden Gem' : '🎨 Creative';
+        const locationHtml = alt.location ? '<span class="swap-alt-location">📍 ' + alt.location + '</span>' : '';
+        const whyHtml = alt.why ? '<p class="swap-alt-why">' + alt.why + '</p>' : '';
+        cardsHtml += '<div class="swap-alternative-card" onclick="pickAlternative(' + dayIndex + ',' + blockIndex + ',' + i + ')">'
+            + '<div class="swap-alt-header">'
+            + '<span class="swap-alt-badge">' + badgeLabel + '</span>'
+            + '<span class="swap-alt-time">' + formatTime(alt.start_time) + ' - ' + formatTime(alt.end_time) + '</span>'
+            + '</div>'
+            + '<h4 class="swap-alt-title">' + alt.title + '</h4>'
+            + '<p class="swap-alt-desc">' + alt.description + '</p>'
+            + locationHtml
+            + whyHtml
+            + '</div>';
+    });
+
+    modal.innerHTML = '<div class="editor-header">'
+        + '<h3>🔄 Pick an Alternative</h3>'
+        + '<button class="editor-close-btn" onclick="closeSwapOverlay()">×</button>'
+        + '</div>'
+        + '<p style="color:var(--color-slate-400);font-size:0.875rem;margin-bottom:1rem;">'
+        + 'Replacing: <strong style="color:white;">' + originalBlock.title + '</strong>'
+        + ' (' + formatTime(originalBlock.start_time) + ' - ' + formatTime(originalBlock.end_time) + ')'
+        + '</p>'
+        + '<div class="swap-alternatives-list">' + cardsHtml + '</div>'
+        + '<div class="editor-actions">'
+        + '<button class="btn-editor-cancel" onclick="closeSwapOverlay()">Keep Original</button>'
+        + '</div>';
+
+    // Store alternatives for picking
+    window._swapAlternatives = alternatives;
+}
+
+function pickAlternative(dayIndex, blockIndex, altIndex) {
+    const alt = window._swapAlternatives[altIndex];
+    if (!alt) return;
+
+    const result = currentItinerary.result || currentItinerary;
+    // Apply the alternative
+    result.daily_schedule[dayIndex].blocks[blockIndex] = {
+        ...result.daily_schedule[dayIndex].blocks[blockIndex],
+        start_time: alt.start_time,
+        end_time: alt.end_time,
+        title: alt.title,
+        location: alt.location,
+        description: alt.description,
+        block_type: alt.block_type,
+        micro_activities: alt.micro_activities || [],
+    };
+
+    closeSwapOverlay();
+    showResult(currentItinerary);
+}
+
+function closeSwapOverlay() {
+    const overlay = document.getElementById('swap-overlay');
+    if (overlay) overlay.remove();
+    window._swapAlternatives = null;
+}
+
+// Make global
+window.swapBlock = swapBlock;
+window.closeSwapOverlay = closeSwapOverlay;
+window.pickAlternative = pickAlternative;
+
+// ========== Regenerate Day ==========
+
+async function regenerateDay(dayIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const day = result.daily_schedule[dayIndex];
+    const destination = result.destination || 'Unknown';
+
+    if (!confirm('Regenerate the entire schedule for Day ' + (day.day_number || dayIndex + 1) + '? This will replace all current activities.')) {
+        return;
+    }
+
+    // Show loading on the day card
+    const dayCard = document.querySelector('[data-day-index="' + dayIndex + '"]');
+    const regenBtn = dayCard?.querySelector('.btn-regenerate-day');
+    if (regenBtn) {
+        regenBtn.disabled = true;
+        regenBtn.innerHTML = '⏳ Regenerating...';
+    }
+
+    try {
+        const response = await fetch(API_BASE + '/edit/regenerate-day', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                day: {
+                    date: day.date,
+                    day_number: day.day_number,
+                    theme: day.theme || '',
+                    blocks: day.blocks || [],
+                },
+                destination: destination,
+                weather_summary: day.weather_summary || '',
+                preferences: {},
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'Regeneration failed');
+        }
+
+        const data = await response.json();
+        if (data.day) {
+            // Replace the day in the schedule
+            result.daily_schedule[dayIndex] = {
+                ...result.daily_schedule[dayIndex],
+                theme: data.day.theme || day.theme,
+                blocks: data.day.blocks || [],
+            };
+            showResult(currentItinerary);
+        }
+
+    } catch (error) {
+        console.error('Regenerate day error:', error);
+        alert('Regeneration failed: ' + error.message);
+        if (regenBtn) {
+            regenBtn.disabled = false;
+            regenBtn.innerHTML = '🔄 Regenerate Day';
+        }
+    }
+}
+
+// Make global
+window.regenerateDay = regenerateDay;
+
+// ========== Agent Pipeline Progress (SSE-driven) ==========
 
 const AGENT_PIPELINE = [
-    { name: 'ResearchAgent', icon: '🔍', label: 'Researching options...' },
-    { name: 'PlannerAgent', icon: '📋', label: 'Planning your days...' },
-    { name: 'WeatherAgent', icon: '🌤️', label: 'Checking weather...' },
-    { name: 'AttractionsAgent', icon: '🏛️', label: 'Finding attractions...' },
-    { name: 'SchedulerAgent', icon: '⏰', label: 'Building schedule...' },
-    { name: 'FoodAgent', icon: '🍽️', label: 'Planning meals...' },
-    { name: 'BudgetAgent', icon: '💰', label: 'Calculating costs...' },
-    { name: 'ValidatorAgent', icon: '✅', label: 'Validating plan...' },
+    { stage: 'research',              icon: '🔍',    label: 'Researching options...' },
+    { stage: 'planner',               icon: '📋',    label: 'Planning your days...' },
+    { stage: 'weather_attractions',   icon: '🌤️🏛️', label: 'Weather & attractions (parallel)...' },
+    { stage: 'scheduler',             icon: '⏰',    label: 'Building schedule...' },
+    { stage: 'food_validator',        icon: '🍽️✅',  label: 'Meals & validation (parallel)...' },
+    { stage: 'budget',                icon: '💰',    label: 'Calculating costs...' },
+    { stage: 'finalizing',            icon: '✨',    label: 'Finalizing your itinerary...' },
 ];
 
+// Track which stages are done
+let pipelineState = {};   // stage -> 'started' | 'done'
 let pipelineInterval = null;
-let pipelineStep = 0;
 
-function startAgentPipeline() {
-    pipelineStep = 0;
-    updatePipelineUI();
-    pipelineInterval = setInterval(() => {
-        pipelineStep++;
-        if (pipelineStep < AGENT_PIPELINE.length) {
-            updatePipelineUI();
-        } else {
-            // Loop back slowly or stay on last
-            clearInterval(pipelineInterval);
-        }
-    }, 3500); // Each agent "works" for ~3.5 seconds
+function resetPipelineUI() {
+    pipelineState = {};
+    renderPipelineUI('research', 'Preparing your trip...');
 }
+
+function startAgentPipeline() { /* no-op, driven by SSE now */ }
 
 function stopAgentPipeline() {
     if (pipelineInterval) {
@@ -1421,22 +1900,29 @@ function stopAgentPipeline() {
     }
 }
 
-function updatePipelineUI() {
+function updatePipelineFromSSE(stage, status, detail) {
+    pipelineState[stage] = status;
+    const pipelineEntry = AGENT_PIPELINE.find(p => p.stage === stage);
+    const label = detail || (pipelineEntry ? pipelineEntry.label : stage);
+    renderPipelineUI(stage, label);
+}
+
+function renderPipelineUI(activeStage, label) {
     const loadingText = document.querySelector('.loading-text');
     if (!loadingText) return;
 
-    const agent = AGENT_PIPELINE[pipelineStep];
-    if (!agent) return;
+    const activeEntry = AGENT_PIPELINE.find(p => p.stage === activeStage);
+    const icon = activeEntry ? activeEntry.icon : '⏳';
 
-    loadingText.innerHTML = `
-        <h3>${agent.icon} ${agent.label}</h3>
-        <p class="agent-name">${agent.name}</p>
-        <div class="pipeline-progress">
-            ${AGENT_PIPELINE.map((a, i) => `
-                <div class="pipeline-dot ${i < pipelineStep ? 'done' : ''} ${i === pipelineStep ? 'active' : ''}" title="${a.name}">
-                    <span>${a.icon}</span>
-                </div>
-            `).join('')}
-        </div>
-    `;
+    let dotsHtml = AGENT_PIPELINE.map(a => {
+        const state = pipelineState[a.stage];
+        let cls = '';
+        if (state === 'done') cls = 'done';
+        else if (state === 'started') cls = 'active';
+        return '<div class="pipeline-dot ' + cls + '" title="' + a.stage + '"><span>' + a.icon + '</span></div>';
+    }).join('');
+
+    loadingText.innerHTML = '<h3>' + icon + ' ' + label + '</h3>'
+        + '<p class="agent-name">' + (activeEntry ? activeEntry.stage : activeStage) + '</p>'
+        + '<div class="pipeline-progress">' + dotsHtml + '</div>';
 }
