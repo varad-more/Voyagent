@@ -27,5 +27,8 @@ python-dotenv>=1.0,<2.0
 pytest>=8.0,<9.0
 pytest-django>=4.8,<5.0
 
+# Static Files (production)
+whitenoise>=6.6,<7.0
+
 # Production
 gunicorn>=21.2,<22.0

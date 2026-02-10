@@ -1,5 +1,5 @@
 """
-Django settings for Trip Planner project.
+Django settings for Voyagent (AI-Powered Trip Planning).
 """
 import os
 from pathlib import Path
@@ -14,6 +14,22 @@ SECRET_KEY = os.environ.get(
 )
 DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() == "true"
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1,0.0.0.0").split(",")
+
+# Cloud Run: Allow the service URL (*.run.app)
+CLOUD_RUN_SERVICE_URL = os.environ.get("CLOUD_RUN_SERVICE_URL", "")
+if CLOUD_RUN_SERVICE_URL:
+    from urllib.parse import urlparse
+    cloud_host = urlparse(CLOUD_RUN_SERVICE_URL).hostname or CLOUD_RUN_SERVICE_URL
+    ALLOWED_HOSTS.append(cloud_host)
+
+# Cloud Run terminates TLS at the load balancer
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# CSRF trusted origins for Cloud Run
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+if CLOUD_RUN_SERVICE_URL:
+    CSRF_TRUSTED_ORIGINS.append(CLOUD_RUN_SERVICE_URL)
+CSRF_TRUSTED_ORIGINS = [o for o in CSRF_TRUSTED_ORIGINS if o]  # remove empty strings
 
 # Application definition
 INSTALLED_APPS = [
@@ -33,6 +49,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # Serve static files in production
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -95,6 +112,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_DIRS = [
     BASE_DIR / "trip_planner" / "static",
 ]
+
+# WhiteNoise: Compress and cache static files in production
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 # Default primary key
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

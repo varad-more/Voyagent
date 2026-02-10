@@ -21,11 +21,12 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Copy project
 COPY . /app/
 
-# Collect static files
-# RUN python manage.py collectstatic --noinput
+# Make entrypoint executable
+RUN chmod +x /app/entrypoint.sh
 
-# Expose port
-EXPOSE 8000
+# Cloud Run injects PORT env var (default 8080)
+ENV PORT=8080
+EXPOSE ${PORT}
 
-# Run gunicorn
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "trip_planner.wsgi:application"]
+# Use entrypoint script (handles migrate, collectstatic, and gunicorn)
+CMD ["/app/entrypoint.sh"]

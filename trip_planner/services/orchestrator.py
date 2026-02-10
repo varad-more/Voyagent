@@ -88,7 +88,12 @@ def generate_itinerary(trip: dict, itinerary) -> dict:
     
     # 5. Scheduler
     weather_overview = weather_result.data.get("weather", {}).get("overview", "Weather unavailable")
-    scheduler_result = scheduler.run(trip=trip, planner_output=planner_result.data, weather_summary=weather_overview)
+    scheduler_result = scheduler.run(
+        trip=trip, 
+        planner_output=planner_result.data, 
+        weather_summary=weather_overview,
+        attractions_output=attractions_result.data
+    )
     _persist_result(itinerary, "scheduler", {"trip": trip}, scheduler_result.data,
                     scheduler_result.drafts, scheduler_result.issues)
     

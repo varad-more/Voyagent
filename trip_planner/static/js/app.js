@@ -1,6 +1,7 @@
 /**
- * Trip Planner - Frontend JavaScript
- * Handles form submission, API calls, and result rendering
+ * Voyagent — AI-Powered Trip Planning
+ * Frontend JavaScript: form handling, API calls, itinerary rendering,
+ * editing, ICS export, and share features.
  */
 
 // API base URL
@@ -138,10 +139,11 @@ async function fetchAutocomplete(query, dropdown, input) {
 
             // Add click handlers
             dropdown.querySelectorAll('.autocomplete-item').forEach(item => {
-                item.addEventListener('click', () => {
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault(); // Prevent blur/focus cycle
                     input.value = item.textContent.trim();
                     dropdown.classList.remove('visible');
-                    input.focus();
+                    dropdown.innerHTML = ''; // Clear so focus won't re-show
                 });
             });
 
@@ -332,6 +334,7 @@ async function handleFormSubmit(e) {
     const payload = buildPayload();
 
     showLoading();
+    startAgentPipeline();
 
     try {
         const response = await fetch(`${API_BASE}/itineraries/generate`, {
@@ -355,10 +358,12 @@ async function handleFormSubmit(e) {
 
         const data = await response.json();
         currentItinerary = data;
+        stopAgentPipeline();
         showResult(data);
 
     } catch (error) {
         console.error('Error:', error);
+        stopAgentPipeline();
         showError(error.message);
     }
 }
@@ -591,7 +596,7 @@ function fillTestData() {
     document.getElementById('daily_end').value = '21:00';
 
     // Set notes
-    document.getElementById('notes').value = 'First time visiting Japan! Interested in cherry blossoms and traditional temples.';
+    document.getElementById('notes').value = 'Road trip through Arizona and Nevada! Interested in desert scenery, the Grand Canyon, and Las Vegas nightlife.';
 
     // Scroll to form and show a brief animation
     document.getElementById('trip-form').scrollIntoView({ behavior: 'smooth' });
@@ -690,8 +695,11 @@ function renderItinerary(data) {
                 
                 <div class="sidebar-column">
                     <div class="action-buttons">
-                        <button class="btn-calendar" onclick="alert('Calendar download coming soon!')">
+                        <button class="btn-calendar" onclick="downloadICS()">
                             📅 Add to Calendar
+                        </button>
+                        <button class="btn-share" onclick="shareItinerary()">
+                            📋 Copy & Share
                         </button>
                         <button class="btn-reset" onclick="resetPlanner()">
                             Start New Plan
@@ -714,8 +722,8 @@ function renderDays(schedule) {
         return '<p>No schedule available.</p>';
     }
 
-    return schedule.map(day => `
-        <div class="day-card glass-card">
+    return schedule.map((day, dayIndex) => `
+        <div class="day-card glass-card" data-day-index="${dayIndex}">
             <div class="day-header">
                 <div class="day-title">
                     <span class="day-badge">Day ${day.day_number}</span>
@@ -727,31 +735,210 @@ function renderDays(schedule) {
             ${day.theme ? `<h4 style="color: var(--color-purple-400); margin-bottom: 1rem;">${day.theme}</h4>` : ''}
             
             <div class="schedule-blocks">
-                ${day.blocks.map(block => renderBlock(block)).join('')}
+                ${day.blocks.map((block, blockIndex) => renderBlock(block, dayIndex, blockIndex)).join('')}
             </div>
+            <button class="btn-add-block" onclick="openAddBlockForm(${dayIndex})">
+                <span>+</span> Add Activity
+            </button>
         </div>
     `).join('');
 }
 
 // Render single block
-function renderBlock(block) {
+function renderBlock(block, dayIndex, blockIndex) {
     const typeClass = block.block_type || 'activity';
     const microActivities = block.micro_activities || [];
 
     return `
-        <div class="schedule-block ${typeClass}">
-            <span class="block-time">${formatTime(block.start_time)} - ${formatTime(block.end_time)}</span>
+        <div class="schedule-block ${typeClass}" data-day-index="${dayIndex}" data-block-index="${blockIndex}">
+            <div class="block-header-row">
+                <span class="block-time">${formatTime(block.start_time)} - ${formatTime(block.end_time)}</span>
+                <button class="block-edit-btn" onclick="openBlockEditor(${dayIndex}, ${blockIndex})" title="Edit this block">
+                    ✏️
+                </button>
+                <button class="block-delete-btn" onclick="deleteBlock(${dayIndex}, ${blockIndex})" title="Delete this block">
+                    🗑️
+                </button>
+            </div>
             <h5 class="block-title">${block.title}</h5>
-            <p class="block-description">${block.description}</p>
-            ${microActivities.length > 0 ? `
-                <div class="micro-activities">
-                    ${microActivities.map(act => `
-                        <span class="micro-tag">• ${typeof act === 'string' ? act : act.name}</span>
-                    `).join('')}
-                </div>
-            ` : ''}
+            <p class="block-description">
+                ${block.description}
+                ${block.website ? `<br><a href="${block.website}" target="_blank" class="block-link">More Info 🔗</a>` : ''}
+            </p>
+            <div class="micro-activities">
+                ${block.is_unique ? `<span class="micro-tag unique-tag">💎 Hidden Gem</span>` : ''}
+                ${block.is_limited_time ? `<span class="micro-tag limited-tag">⏳ Limited Time</span>` : ''}
+                ${microActivities.map(act => `
+                    <span class="micro-tag">• ${typeof act === 'string' ? act : act.name}</span>
+                `).join('')}
+            </div>
         </div>
     `;
+}
+
+// ========== Block Editing ==========
+
+function openBlockEditor(dayIndex, blockIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const block = result.daily_schedule[dayIndex].blocks[blockIndex];
+
+    // Remove any existing editor
+    closeBlockEditor();
+
+    const editorHtml = `
+        <div class="block-editor-overlay" id="block-editor-overlay" onclick="if(event.target===this) closeBlockEditor()">
+            <div class="block-editor-modal">
+                <div class="editor-header">
+                    <h3>✏️ Edit Block</h3>
+                    <button class="editor-close-btn" onclick="closeBlockEditor()">×</button>
+                </div>
+
+                <div class="editor-fields">
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Title</label>
+                            <input type="text" id="edit-title" value="${block.title || ''}">
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Start Time</label>
+                            <input type="time" id="edit-start-time" value="${block.start_time || ''}">
+                        </div>
+                        <div class="editor-field">
+                            <label>End Time</label>
+                            <input type="time" id="edit-end-time" value="${block.end_time || ''}">
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Location</label>
+                            <input type="text" id="edit-location" value="${block.location || ''}">
+                        </div>
+                        <div class="editor-field">
+                            <label>Type</label>
+                            <select id="edit-block-type">
+                                <option value="activity" ${block.block_type === 'activity' ? 'selected' : ''}>Activity</option>
+                                <option value="meal" ${block.block_type === 'meal' ? 'selected' : ''}>Meal</option>
+                                <option value="travel" ${block.block_type === 'travel' ? 'selected' : ''}>Travel</option>
+                                <option value="rest" ${block.block_type === 'rest' ? 'selected' : ''}>Rest</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field full-width">
+                            <label>Description</label>
+                            <textarea id="edit-description" rows="2">${block.description || ''}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-divider">
+                    <span>or let AI edit for you</span>
+                </div>
+
+                <div class="editor-ai-section">
+                    <div class="editor-field full-width">
+                        <label>🤖 AI Instruction</label>
+                        <input type="text" id="edit-ai-instruction" placeholder="e.g. Make it a lunch instead, or change to 3 PM">
+                    </div>
+                    <button class="btn-ai-edit" id="btn-ai-edit" onclick="aiEditBlock(${dayIndex}, ${blockIndex})">
+                        ✨ AI Edit
+                    </button>
+                </div>
+
+                <div class="editor-actions">
+                    <button class="btn-editor-cancel" onclick="closeBlockEditor()">Cancel</button>
+                    <button class="btn-editor-save" onclick="saveBlockEdit(${dayIndex}, ${blockIndex})">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', editorHtml);
+    // Focus the title field
+    setTimeout(() => document.getElementById('edit-title')?.focus(), 100);
+}
+
+function closeBlockEditor() {
+    const overlay = document.getElementById('block-editor-overlay');
+    if (overlay) overlay.remove();
+}
+
+function saveBlockEdit(dayIndex, blockIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const block = result.daily_schedule[dayIndex].blocks[blockIndex];
+
+    block.title = document.getElementById('edit-title').value;
+    block.start_time = document.getElementById('edit-start-time').value;
+    block.end_time = document.getElementById('edit-end-time').value;
+    block.location = document.getElementById('edit-location').value;
+    block.block_type = document.getElementById('edit-block-type').value;
+    block.description = document.getElementById('edit-description').value;
+
+    closeBlockEditor();
+    showResult(currentItinerary);
+}
+
+async function aiEditBlock(dayIndex, blockIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const block = result.daily_schedule[dayIndex].blocks[blockIndex];
+    const destination = result.destination || 'Unknown';
+    const instruction = document.getElementById('edit-ai-instruction').value.trim();
+
+    if (!instruction) {
+        document.getElementById('edit-ai-instruction').style.borderColor = 'var(--color-rose-400)';
+        document.getElementById('edit-ai-instruction').placeholder = 'Please type an instruction first...';
+        return;
+    }
+
+    const btn = document.getElementById('btn-ai-edit');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Thinking...';
+
+    try {
+        const response = await fetch(`${API_BASE}/edit/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                day_index: dayIndex,
+                block_index: blockIndex,
+                instruction: instruction,
+                current_block: {
+                    start_time: block.start_time,
+                    end_time: block.end_time,
+                    title: block.title,
+                    location: block.location || '',
+                    description: block.description || '',
+                    block_type: block.block_type || 'activity',
+                    travel_time_mins: block.travel_time_mins || 0,
+                    buffer_mins: block.buffer_mins || 0,
+                    micro_activities: block.micro_activities || []
+                },
+                destination: destination
+            })
+        });
+
+        if (!response.ok) {
+            const err = await response.json();
+            throw new Error(err.error || 'AI edit failed');
+        }
+
+        const data = await response.json();
+        if (data.block) {
+            // Apply the AI-edited block
+            Object.assign(result.daily_schedule[dayIndex].blocks[blockIndex], data.block);
+            closeBlockEditor();
+            showResult(currentItinerary);
+        } else {
+            throw new Error('AI returned no block data');
+        }
+    } catch (error) {
+        console.error('AI edit error:', error);
+        btn.disabled = false;
+        btn.innerHTML = '✨ AI Edit';
+        alert(`AI Edit failed: ${error.message}`);
+    }
 }
 
 // Render transport widget
@@ -864,6 +1051,13 @@ function addDestinationInput(value = '') {
     `;
 
     container.appendChild(row);
+
+    // Wire up autocomplete on the new input
+    const newInput = row.querySelector('.destination-input');
+    if (newInput) {
+        setupAutocomplete(newInput);
+    }
+
     updateDestinationIcons();
 }
 
@@ -907,3 +1101,336 @@ function updateDestinationIcons() {
 window.toggleTripType = toggleTripType;
 window.addDestinationInput = addDestinationInput;
 window.removeDestinationInput = removeDestinationInput;
+
+// ========== ICS Calendar Download ==========
+
+function downloadICS() {
+    if (!currentItinerary) return;
+    const result = currentItinerary.result || currentItinerary;
+    const schedule = result.daily_schedule || [];
+
+    let ics = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//Voyagent//Trip Planner//EN',
+        'CALSCALE:GREGORIAN',
+        'METHOD:PUBLISH',
+        `X-WR-CALNAME:${result.destination || 'Trip'}`
+    ];
+
+    schedule.forEach(day => {
+        const dateStr = (day.date || '').replace(/-/g, '');
+        if (!dateStr) return;
+
+        (day.blocks || []).forEach(block => {
+            const startTime = (block.start_time || '09:00').replace(':', '') + '00';
+            const endTime = (block.end_time || '10:00').replace(':', '') + '00';
+            const uid = `${dateStr}-${startTime}-${Math.random().toString(36).substr(2, 8)}@voyagent`;
+
+            ics.push('BEGIN:VEVENT');
+            ics.push(`DTSTART:${dateStr}T${startTime}`);
+            ics.push(`DTEND:${dateStr}T${endTime}`);
+            ics.push(`SUMMARY:${(block.title || 'Activity').replace(/,/g, '\\,')}`);
+            ics.push(`DESCRIPTION:${(block.description || '').replace(/\n/g, '\\n').replace(/,/g, '\\,')}`);
+            if (block.location) {
+                ics.push(`LOCATION:${block.location.replace(/,/g, '\\,')}`);
+            }
+            ics.push(`UID:${uid}`);
+            ics.push('END:VEVENT');
+        });
+    });
+
+    ics.push('END:VCALENDAR');
+
+    const blob = new Blob([ics.join('\r\n')], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `voyagent-${(result.destination || 'trip').replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.ics`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+}
+
+// ========== Share / Copy Itinerary ==========
+
+function shareItinerary() {
+    if (!currentItinerary) return;
+    const result = currentItinerary.result || currentItinerary;
+    const schedule = result.daily_schedule || [];
+
+    let text = `✈️ ${result.destination || 'My Trip'}\n`;
+    text += `📅 ${result.start_date} → ${result.end_date}\n`;
+    text += `━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    schedule.forEach(day => {
+        text += `📌 Day ${day.day_number}: ${day.theme || formatDate(day.date)}\n`;
+        if (day.weather_summary) text += `   🌤️ ${day.weather_summary}\n`;
+        (day.blocks || []).forEach(block => {
+            const icon = block.block_type === 'meal' ? '🍽️' : block.block_type === 'travel' ? '🚗' : '📍';
+            text += `   ${icon} ${block.start_time}–${block.end_time}  ${block.title}\n`;
+        });
+        text += `\n`;
+    });
+
+    const budget = result.budget_breakdown;
+    if (budget && budget.total) {
+        text += `💰 Total Budget: ${budget.total.currency || '$'}${budget.total.amount}\n`;
+    }
+    text += `\n— Generated by Voyagent ✨`;
+
+    navigator.clipboard.writeText(text).then(() => {
+        // Show a brief "Copied!" feedback
+        const btn = document.querySelector('.btn-share');
+        if (btn) {
+            const original = btn.innerHTML;
+            btn.innerHTML = '✅ Copied to Clipboard!';
+            btn.style.background = 'linear-gradient(135deg, var(--color-emerald-500), var(--color-cyan-400))';
+            setTimeout(() => {
+                btn.innerHTML = original;
+                btn.style.background = '';
+            }, 2000);
+        }
+    }).catch(() => {
+        // Fallback: show text in a prompt for manual copy
+        prompt('Copy this itinerary:', text);
+    });
+}
+
+// ========== Delete Block ==========
+
+function deleteBlock(dayIndex, blockIndex) {
+    const result = currentItinerary.result || currentItinerary;
+    const block = result.daily_schedule[dayIndex].blocks[blockIndex];
+
+    if (!confirm(`Delete "${block.title}"?`)) return;
+
+    result.daily_schedule[dayIndex].blocks.splice(blockIndex, 1);
+    showResult(currentItinerary);
+}
+
+// ========== Add New Block ==========
+
+function openAddBlockForm(dayIndex) {
+    closeBlockEditor(); // Close any existing modal
+
+    const editorHtml = `
+        <div class="block-editor-overlay" id="block-editor-overlay" onclick="if(event.target===this) closeBlockEditor()">
+            <div class="block-editor-modal">
+                <div class="editor-header">
+                    <h3>➕ Add New Activity</h3>
+                    <button class="editor-close-btn" onclick="closeBlockEditor()">×</button>
+                </div>
+
+                <div class="editor-fields">
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Title</label>
+                            <input type="text" id="add-title" placeholder="e.g. Visit the Museum">
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Start Time</label>
+                            <input type="time" id="add-start-time" value="10:00">
+                        </div>
+                        <div class="editor-field">
+                            <label>End Time</label>
+                            <input type="time" id="add-end-time" value="12:00">
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field">
+                            <label>Location</label>
+                            <input type="text" id="add-location" placeholder="e.g. Downtown">
+                        </div>
+                        <div class="editor-field">
+                            <label>Type</label>
+                            <select id="add-block-type">
+                                <option value="activity" selected>Activity</option>
+                                <option value="meal">Meal</option>
+                                <option value="travel">Travel</option>
+                                <option value="rest">Rest</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="editor-row">
+                        <div class="editor-field full-width">
+                            <label>Description</label>
+                            <textarea id="add-description" rows="2" placeholder="Brief description..."></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="editor-divider">
+                    <span>or use Magic Fill ✨</span>
+                </div>
+
+                <div class="editor-ai-section">
+                    <div class="editor-field full-width">
+                        <label>🤖 AI Instruction</label>
+                        <input type="text" id="magic-fill-instruction" placeholder="e.g. Suggest a top-rated sushi place for dinner">
+                    </div>
+                    <button class="btn-ai-edit" id="btn-magic-fill" onclick="magicFillBlock()">
+                        ✨ Auto-Fill
+                    </button>
+                </div>
+
+                <div class="editor-actions">
+                    <button class="btn-editor-cancel" onclick="closeBlockEditor()">Cancel</button>
+                    <button class="btn-editor-save" onclick="saveNewBlock(${dayIndex})">Add to Day</button>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', editorHtml);
+    setTimeout(() => document.getElementById('add-title')?.focus(), 100);
+}
+
+async function magicFillBlock() {
+    const instruction = document.getElementById('magic-fill-instruction').value.trim();
+    if (!instruction) {
+        document.getElementById('magic-fill-instruction').style.borderColor = 'var(--color-rose-400)';
+        return;
+    }
+
+    const btn = document.getElementById('btn-magic-fill');
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Thinking...';
+
+    try {
+        // Send a template block to the existing edit endpoint
+        // effectively asking AI to "edit" a blank block into what we want
+        const response = await fetch(`${API_BASE}/edit/block`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                day_index: 0,
+                block_index: 0,
+                instruction: instruction,
+                current_block: {
+                    start_time: document.getElementById('add-start-time').value || "10:00",
+                    end_time: document.getElementById('add-end-time').value || "12:00",
+                    title: "New Activity",
+                    location: "TBD",
+                    description: "TBD",
+                    block_type: "activity",
+                    travel_time_mins: 0,
+                    buffer_mins: 0,
+                    micro_activities: []
+                },
+                destination: (currentItinerary.result || currentItinerary).destination || 'Unknown'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error('Magic Fill failed');
+        }
+
+        const data = await response.json();
+        if (data.block) {
+            // Populate form fields
+            const b = data.block;
+            document.getElementById('add-title').value = b.title || '';
+            document.getElementById('add-start-time').value = b.start_time || '';
+            document.getElementById('add-end-time').value = b.end_time || '';
+            document.getElementById('add-location').value = b.location || '';
+            document.getElementById('add-block-type').value = b.block_type || 'activity';
+            document.getElementById('add-description').value = b.description || '';
+        }
+    } catch (error) {
+        console.error('Magic Fill error:', error);
+        alert('Could not auto-fill. Please try again or fill manually.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '✨ Auto-Fill';
+    }
+}
+
+function saveNewBlock(dayIndex) {
+    const title = document.getElementById('add-title').value.trim();
+    if (!title) {
+        document.getElementById('add-title').style.borderColor = 'var(--color-rose-400)';
+        return;
+    }
+
+    const result = currentItinerary.result || currentItinerary;
+    const newBlock = {
+        title: title,
+        start_time: document.getElementById('add-start-time').value,
+        end_time: document.getElementById('add-end-time').value,
+        location: document.getElementById('add-location').value,
+        block_type: document.getElementById('add-block-type').value,
+        description: document.getElementById('add-description').value,
+        micro_activities: []
+    };
+
+    result.daily_schedule[dayIndex].blocks.push(newBlock);
+
+    // Sort blocks by start_time
+    result.daily_schedule[dayIndex].blocks.sort((a, b) => {
+        return (a.start_time || '').localeCompare(b.start_time || '');
+    });
+
+    closeBlockEditor();
+    showResult(currentItinerary);
+}
+
+// ========== Agent Pipeline Progress ==========
+
+const AGENT_PIPELINE = [
+    { name: 'ResearchAgent', icon: '🔍', label: 'Researching options...' },
+    { name: 'PlannerAgent', icon: '📋', label: 'Planning your days...' },
+    { name: 'WeatherAgent', icon: '🌤️', label: 'Checking weather...' },
+    { name: 'AttractionsAgent', icon: '🏛️', label: 'Finding attractions...' },
+    { name: 'SchedulerAgent', icon: '⏰', label: 'Building schedule...' },
+    { name: 'FoodAgent', icon: '🍽️', label: 'Planning meals...' },
+    { name: 'BudgetAgent', icon: '💰', label: 'Calculating costs...' },
+    { name: 'ValidatorAgent', icon: '✅', label: 'Validating plan...' },
+];
+
+let pipelineInterval = null;
+let pipelineStep = 0;
+
+function startAgentPipeline() {
+    pipelineStep = 0;
+    updatePipelineUI();
+    pipelineInterval = setInterval(() => {
+        pipelineStep++;
+        if (pipelineStep < AGENT_PIPELINE.length) {
+            updatePipelineUI();
+        } else {
+            // Loop back slowly or stay on last
+            clearInterval(pipelineInterval);
+        }
+    }, 3500); // Each agent "works" for ~3.5 seconds
+}
+
+function stopAgentPipeline() {
+    if (pipelineInterval) {
+        clearInterval(pipelineInterval);
+        pipelineInterval = null;
+    }
+}
+
+function updatePipelineUI() {
+    const loadingText = document.querySelector('.loading-text');
+    if (!loadingText) return;
+
+    const agent = AGENT_PIPELINE[pipelineStep];
+    if (!agent) return;
+
+    loadingText.innerHTML = `
+        <h3>${agent.icon} ${agent.label}</h3>
+        <p class="agent-name">${agent.name}</p>
+        <div class="pipeline-progress">
+            ${AGENT_PIPELINE.map((a, i) => `
+                <div class="pipeline-dot ${i < pipelineStep ? 'done' : ''} ${i === pipelineStep ? 'active' : ''}" title="${a.name}">
+                    <span>${a.icon}</span>
+                </div>
+            `).join('')}
+        </div>
+    `;
+}

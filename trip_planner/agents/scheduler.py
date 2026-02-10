@@ -18,7 +18,27 @@ SCHEMA = {
                 "properties": {
                     "date": {"type": "string"},
                     "weather_summary": {"type": "string"},
-                    "schedule": {"type": "array"},
+                    "schedule": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "start_time": {"type": "string"},
+                                "end_time": {"type": "string"},
+                                "title": {"type": "string"},
+                                "location": {"type": "string"},
+                                "description": {"type": "string"},
+                                "block_type": {"type": "string"},
+                                "website": {"type": "string"},
+                                "is_unique": {"type": "boolean"},
+                                "is_limited_time": {"type": "boolean"},
+                                "travel_time_mins": {"type": "integer"},
+                                "buffer_mins": {"type": "integer"},
+                                "micro_activities": {"type": "array", "items": {"type": "string"}}
+                            },
+                            "required": ["start_time", "end_time", "title"]
+                        }
+                    },
                     "notes": {"type": "array", "items": {"type": "string"}}
                 }
             }
@@ -30,19 +50,27 @@ SCHEMA = {
 class SchedulerAgent(BaseAgent):
     name = "scheduler"
     
-    def run(self, trip: dict, planner_output: dict, weather_summary: str) -> AgentResult:
+    def run(self, trip: dict, planner_output: dict, weather_summary: str, attractions_output: dict = None) -> AgentResult:
         dest = trip.get("destination", "")
         
         if not self.has_ai:
             return self._create_stub(trip, planner_output, weather_summary)
         
         buffer = settings.PLANNER_BUFFER_MINUTES
-        system = "Convert skeleton plan to timed schedule with realistic travel/buffer times."
+        attractions_context = ""
+        if attractions_output:
+            attractions_context = f"\nRanked Attractions:\n{attractions_output.get('attractions', [])}"
+
+        system = """Convert skeleton plan to timed schedule with realistic travel/buffer times.
+        You MUST incorporate the top 'unique' and 'limited_time' attractions from the provided context if they fit the theme.
+        Include 'website' link for activities if available. Set 'is_unique' or 'is_limited_time' flags true for special items.
+        """
         user = (
             f"Destination: {dest}\n"
             f"Daily window: {trip.get('daily_start_time', '09:00')} - {trip.get('daily_end_time', '20:00')}\n"
             f"Buffer: {buffer} mins\nWeather: {weather_summary}\n"
-            f"Plan: {planner_output}"
+            f"Plan: {planner_output}\n"
+            f"{attractions_context}"
         )
         
         try:
@@ -52,7 +80,7 @@ class SchedulerAgent(BaseAgent):
             logger.error(f"SchedulerAgent failed: {e}")
             return self._create_stub(trip, planner_output, weather_summary)
     
-    def _create_stub(self, trip: dict, planner: dict, weather: str) -> AgentResult:
+    def _create_stub(self, trip: dict, planner: dict, weather: str, attractions: dict = None) -> AgentResult:
         dest = trip.get("destination", "")
         days = []
         

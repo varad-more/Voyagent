@@ -25,12 +25,25 @@ class ItineraryCreateView(APIView):
             return Response({"error": "validation_error", "details": serializer.errors},
                           status=status.HTTP_400_BAD_REQUEST)
         
+        trip_data = self._serialize_trip(serializer.validated_data)
         itinerary = Itinerary.objects.create(
             status=ItineraryStatus.QUEUED,
-            request_json=serializer.validated_data
+            request_json=trip_data
         )
         
         return Response(ItinerarySerializer(itinerary).data, status=status.HTTP_201_CREATED)
+    
+    @staticmethod
+    def _serialize_trip(data: dict) -> dict:
+        """Convert date/time objects to ISO strings for JSON storage."""
+        result = dict(data)
+        for key in ["start_date", "end_date"]:
+            if key in result and hasattr(result[key], "isoformat"):
+                result[key] = result[key].isoformat()
+        for key in ["daily_start_time", "daily_end_time"]:
+            if key in result and hasattr(result[key], "isoformat"):
+                result[key] = result[key].isoformat()
+        return result
 
 
 class ItineraryGenerateView(APIView):

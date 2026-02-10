@@ -17,10 +17,15 @@ SCHEMA = {
                 "type": "object",
                 "properties": {
                     "name": {"type": "string"},
+                    "description": {"type": "string"},
                     "reason": {"type": "string"},
                     "score": {"type": "number"},
-                    "categories": {"type": "array", "items": {"type": "string"}}
-                }
+                    "categories": {"type": "array", "items": {"type": "string"}},
+                    "unique_features": {"type": "string", "description": "Ideally highlight if hidden gem or unique"},
+                    "limited_time_note": {"type": "string", "description": "If seasonal event or temporary exhibit"},
+                    "website": {"type": "string", "description": "Official link or info page"}
+                },
+                "required": ["name", "reason"]
             }
         }
     }
@@ -39,8 +44,16 @@ class AttractionsAgent(BaseAgent):
         if not self.has_ai:
             return self._stub_result({"attractions": places_data.get("attractions", [])})
         
-        system = "Rank attractions by fit for traveler interests."
-        user = f"Destination: {dest}\nInterests: {interests}\nPlaces: {places_data}"
+        system = """Rank attractions by fit for traveler interests.
+        CRITICAL: Prioritize "unique" experiences, "hidden gems", and "limited-time" events/festivals happening during the trip dates.
+        Provide a website or Google Maps link if possible for each top attraction.
+        """
+        user = (
+            f"Destination: {dest}\n"
+            f"Dates: {trip.get('start_date')} to {trip.get('end_date')}\n"
+            f"Interests: {interests}\n"
+            f"Google Places Data: {places_data}\n"
+        )
         
         try:
             data, drafts, issues = generate_validated(self.gemini_client, system, user, SCHEMA)
