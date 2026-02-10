@@ -39,7 +39,7 @@ Since Render's free tier files are ephemeral (deleted on restart), you need an e
       ```
     - **Start Command**: 
       ```bash
-      gunicorn trip_planner.wsgi:application
+      gunicorn trip_planner.wsgi:application --bind 0.0.0.0:$PORT
       ```
     - **Instance Type**: Select **Free**.
 

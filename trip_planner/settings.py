@@ -22,13 +22,27 @@ if CLOUD_RUN_SERVICE_URL:
     cloud_host = urlparse(CLOUD_RUN_SERVICE_URL).hostname or CLOUD_RUN_SERVICE_URL
     ALLOWED_HOSTS.append(cloud_host)
 
+# Initialize CSRF trusted origins
+CSRF_TRUSTED_ORIGINS = []
+
+# Render: Automatic configuration
+if os.environ.get("RENDER"):
+    ALLOWED_HOSTS.append(".onrender.com")
+    render_hostname = os.environ.get("RENDER_EXTERNAL_HOSTNAME")
+    if render_hostname:
+        ALLOWED_HOSTS.append(render_hostname)
+        CSRF_TRUSTED_ORIGINS.append(f"https://{render_hostname}")
+
 # Cloud Run terminates TLS at the load balancer
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-# CSRF trusted origins for Cloud Run
-CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+# CSRF env var integration
+if os.environ.get("CSRF_TRUSTED_ORIGINS"):
+    CSRF_TRUSTED_ORIGINS.extend(os.environ.get("CSRF_TRUSTED_ORIGINS").split(","))
+
 if CLOUD_RUN_SERVICE_URL:
     CSRF_TRUSTED_ORIGINS.append(CLOUD_RUN_SERVICE_URL)
+    
 CSRF_TRUSTED_ORIGINS = [o for o in CSRF_TRUSTED_ORIGINS if o]  # remove empty strings
 
 # Application definition

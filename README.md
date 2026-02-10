@@ -1,6 +1,6 @@
 # ✈️ Voyagent — Your AI Travel Crew
 
-> **8 specialized agents. One perfect trip.**
+> **Stop Planning. Start Traveling.**
 
 Voyagent is an AI-powered trip planning application built with Django and Google Gemini. Its agentic architecture uses 8 specialized AI agents — each handling a different aspect of travel planning — coordinated by an orchestrator to craft comprehensive, personalized itineraries.
 
