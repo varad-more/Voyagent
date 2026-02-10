@@ -11,7 +11,7 @@ from trip_planner.models import Itinerary, ItineraryStatus
 from trip_planner.api.serializers import TripRequestSerializer, ItinerarySerializer
 from trip_planner.services.orchestrator import generate_itinerary
 from trip_planner.core.utils import build_ics
-from trip_planner.core.exceptions import GeminiError
+from trip_planner.core.exceptions import GeminiError, GeminiQuotaError
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +66,13 @@ class ItineraryGenerateView(APIView):
             result = generate_itinerary(trip_data, itinerary)
             itinerary.mark_completed(result)
             return Response(result)
+        except GeminiQuotaError as e:
+            logger.error(f"Gemini Quota Exhausted: {e}")
+            itinerary.mark_failed("Quota Exhausted")
+            return Response(
+                {"error": "quota_exhausted", "message": "The AI is currently overloaded (Quota Exhausted). Please try again in a few moments.", "code": "gemini_quota_exhausted"},
+                status=status.HTTP_429_TOO_MANY_REQUESTS
+            )
         except GeminiError as e:
             logger.error(f"Gemini API error: {e}")
             itinerary.mark_failed(str(e))

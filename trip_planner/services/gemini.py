@@ -8,7 +8,7 @@ from google.genai import types
 from django.conf import settings
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from trip_planner.core.exceptions import GeminiError
+from trip_planner.core.exceptions import GeminiError, GeminiQuotaError
 from trip_planner.core.utils import best_effort_json
 
 logger = logging.getLogger(__name__)
@@ -40,8 +40,12 @@ class GeminiClient:
         try:
             self.client = genai.Client(api_key=api_key)
             self.model_name = settings.GEMINI_MODEL
+            # Build list of models to try: Primary -> Fallbacks
+            fallback_list = [m.strip() for m in getattr(settings, "GEMINI_FALLBACK_MODELS", []) if m.strip()]
+            self.models = [self.model_name] + [m for m in fallback_list if m != self.model_name]
+            
             self._initialized = True
-            logger.info(f"Gemini initialized: {settings.GEMINI_MODEL}")
+            logger.info(f"Gemini initialized with models: {self.models}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini: {e}")
             self.client = None
@@ -67,50 +71,65 @@ class GeminiClient:
         if not self.is_available:
             raise GeminiError(getattr(self, "_error_reason", "Gemini not available"))
         
-        try:
-            # Common config
-            config = types.GenerateContentConfig(
-                temperature=0.4,
-                response_mime_type="application/json",
-                response_schema=schema,
-            ) if schema else types.GenerateContentConfig(
-                temperature=0.4,
-                response_mime_type="application/json",
-            )
+        last_exception = None
+        
+        # Try each model in sequence
+        for model in self.models:
+            try:
+                # Common config
+                config = types.GenerateContentConfig(
+                    temperature=0.4,
+                    response_mime_type="application/json",
+                    response_schema=schema,
+                ) if schema else types.GenerateContentConfig(
+                    temperature=0.4,
+                    response_mime_type="application/json",
+                )
 
-            response = self.client.models.generate_content(
-                model=self.model_name,
-                contents=prompt,
-                config=config,
-            )
-            return response.text or ""
-            
-        except Exception as e:
-            if self._is_retryable_error(e):
-                logger.warning(f"Gemini 429/Quota error, retrying... ({e})")
-                raise # tenacity will catch this
-            
-            # Non-retryable error, or schema failed
-            if schema:
-                logger.warning(f"Schema-guided generation failed, retrying without schema: {e}")
-                try:
-                    config = types.GenerateContentConfig(
-                        temperature=0.4,
-                        response_mime_type="application/json",
-                    )
-                    response = self.client.models.generate_content(
-                        model=self.model_name,
-                        contents=prompt,
-                        config=config,
-                    )
-                    return response.text or ""
-                except Exception as inner:
-                    # If this is also 429, we should technically retry, but simplified here
-                    if self._is_retryable_error(inner):
-                         raise # Propagate for retry
-                    raise GeminiError(str(inner))
-            
-            raise GeminiError(str(e))
+                response = self.client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=config,
+                )
+                return response.text or ""
+                
+            except Exception as e:
+                last_exception = e
+                is_retryable = self._is_retryable_error(e)
+                is_not_found = "not found" in str(e).lower() or "404" in str(e)
+                
+                # If retryable (quota) OR not found (model invalid), try next model
+                if is_retryable or is_not_found:
+                    logger.warning(f"Model {model} failed ({e}), trying next fallback...")
+                    continue
+                
+                # Non-retryable error, check schema failure fallback
+                if schema:
+                     logger.warning(f"Schema-guided generation failed on {model}, retrying without schema: {e}")
+                     try:
+                        config = types.GenerateContentConfig(temperature=0.4, response_mime_type="application/json")
+                        response = self.client.models.generate_content(
+                            model=model,
+                            contents=prompt,
+                            config=config,
+                        )
+                        return response.text or ""
+                     except Exception as inner:
+                        # If inner failed, we could try next model, but for simplicity, raise or continue
+                        if self._is_retryable_error(inner) or "not found" in str(inner).lower():
+                             continue # Continue outer loop
+                        raise GeminiError(str(inner))
+                
+                # If neither retryable nor schema issue, break and raise
+                raise GeminiError(str(e))
+        
+        # If all models failed
+        if last_exception:
+            if self._is_retryable_error(last_exception):
+                 # Logging already done by loop, raise for tenacity
+                 raise last_exception 
+            raise GeminiError(str(last_exception))
+        raise GeminiError("No models available")
     
     def generate_from_image(self, image_bytes: bytes, prompt: str) -> str:
         """Generate content from image using Gemini Vision."""
@@ -170,6 +189,8 @@ def generate_validated(client: GeminiClient, system_prompt: str,
         return best_effort_json(repaired), drafts, issues
         
     except Exception as e:
+        if client._is_retryable_error(e):
+            raise GeminiQuotaError(f"Gemini Quota Exhausted: {e}")
         issues.append(f"generation_failed: {e}")
         raise GeminiError(f"Failed to generate content: {e}")
 

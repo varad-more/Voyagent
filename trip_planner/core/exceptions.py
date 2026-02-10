@@ -23,6 +23,13 @@ class GeminiError(TripPlannerError):
         super().__init__(message, "gemini_error")
 
 
+class GeminiQuotaError(GeminiError):
+    """Raised when Gemini API quota is exhausted (429)."""
+    def __init__(self, message: str = "Gemini API Quota Exhausted"):
+        super().__init__(message)
+        self.code = "gemini_quota_exhausted"
+
+
 class ExternalAPIError(TripPlannerError):
     """Raised when an external API call fails."""
     def __init__(self, service: str, message: str):

@@ -353,6 +353,11 @@ async function handleFormSubmit(e) {
                 throw new Error("⚠️ Gemini API Key Missing.\n\nPlease check your server console and README.md for setup instructions.");
             }
 
+            // Handle Quota Exhaustion (429)
+            if (response.status === 429 || errorData.code === 'gemini_quota_exhausted') {
+                throw new Error("🚫 AI Capacity Reached.\n\nThe Gemini AI service is currently overloaded (Quota Exhausted).\nPlease wait a few moments and try again.");
+            }
+
             throw new Error(errorData.error || errorData.detail || 'Failed to generate itinerary');
         }
 
@@ -637,6 +642,7 @@ function showError(message) {
     errorSection.classList.remove('hidden');
     resultSection.classList.add('hidden');
     errorMessage.textContent = message;
+    errorMessage.style.whiteSpace = 'pre-wrap'; // Ensure newlines render properly
 }
 
 function showResult(data) {
