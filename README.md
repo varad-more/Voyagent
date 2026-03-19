@@ -6,6 +6,15 @@ Voyagent is an AI-powered trip planning application built with Django and Google
 
 ---
 
+## 🗺️ Build & Roadmap Docs
+
+- Implementation plan: `docs/IMPLEMENTATION_PLAN.md`
+- Feature backlog: `docs/FEATURE_SUGGESTIONS.md`
+
+These docs explain how to replicate Voyagent-style architecture on another machine/team and what to build next.
+
+---
+
 ## 📖 About the Project
 
 ### Inspiration
